@@ -205,16 +205,71 @@ data = MagicData(cfg)
 trainer = Trainer(**cfg.training)
 ```
 
-#### Option 3: Use the CLI
+#### Option 3: Use the AutoLightning CLI (based on PyTorch Lightning CLI)
 
 ```python
 # TO DO!
 ```
 
+#### Option 3: Use the original PyTorch Lightning CLI based on fixed classes
+
+This way, you can reuse the features of the Lightning CLI and use it to store the main configuration separate (`cfg` in this case) from the trainer configuration (can be provided via the `--config` flag), which often contains environment-specific settings like GPU indices, etc. To see how this can be done, see [here](https://lightning.ai/docs/pytorch/stable/cli/lightning_cli_intermediate.html) for a crisp overview of the PyTorch Lightning CLI.
+
+```python
+# file: main.py
+
+from autolightning import pre_cli
+
+from autolightning.lm import SupervisedLearner
+from autolightning.datasets import MagicData
+
+from lightning.pytorch.cli import LightningCLI
+
+def cli_main():
+    cfg = ... # Load or set the configuration
+
+    LightningCLI(
+        pre_cli(SupervisedLearner, cfg), # All arguments after cfg are available to be set in the CLI
+        pre_cli(MagicData, cfg), # Same goes for the data module
+        trainer_defaults=cfg["training"] if "training" in cfg else None,
+        seed_everything_default=cfg["seed"] if "seed" in cfg else True,
+    )
+
+if __name__ == "__main__":
+    cli_main()
+```
+
 ### 3. Train the model
+
+If you have the model, data and trainer, you can train the model using the following code:
 
 ```python
 trainer.fit(model, data)
+```
+
+In case you used the CLI, you can run the following command:
+
+```bash
+python main.py fit --config ./config.yaml
+```
+
+Where `config.yaml` for example looks like this:
+
+```yaml
+trainer:
+  logger:
+    - class_path: WandbLogger
+      init_args:
+        project: test_autolightning
+  callbacks:
+    - class_path: ModelCheckpoint
+      init_args:
+        dirpath: ./nets
+        monitor: val/accuracy
+        save_top_k: 1
+  accelerator: gpu
+  check_val_every_n_epoch: 1
+  log_every_n_steps: 20
 ```
 
 ## Customization
