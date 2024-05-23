@@ -187,7 +187,7 @@ cfg = cfg.toDict()
 
 ### 2. Get the model, data and trainer
 
-#### Option 1: Let `autolightning` do the work
+#### Option 1: Let `autolightning` do the work (for example in notebooks or embedded in other scripts)
 
 ```python
 from lightning.pytorch.loggers import WandbLogger
@@ -207,7 +207,7 @@ trainer, model, data = config_all(cfg,
 )
 ```
 
-#### Option 2: Create the objects separately based on fixed classes
+#### Option 2: Create the objects manually
 
 ```python
 from autolightning.lm import SupervisedLearner
@@ -218,7 +218,7 @@ from lightning import Trainer
 # Create the model, data and trainer
 model = SupervisedLearner(cfg)
 data = MagicData(cfg)
-trainer = Trainer(**cfg.training)
+trainer = Trainer(**cfg["training"])
 ```
 
 #### Option 3: Use the AutoLightning CLI (based on PyTorch Lightning CLI)
@@ -227,9 +227,11 @@ trainer = Trainer(**cfg.training)
 # TO DO!
 ```
 
-#### Option 3: Use the original PyTorch Lightning CLI based on fixed classes
+#### Option 4: Use the original PyTorch Lightning CLI
 
-This way, you can reuse the features of the Lightning CLI and use it to store the main configuration separate (`cfg` in this case) from the trainer configuration (can be provided via the `--config` flag), which often contains environment-specific settings like GPU indices, etc. To see how this can be done, see [here](https://lightning.ai/docs/pytorch/stable/cli/lightning_cli_intermediate.html) for a crisp overview of the PyTorch Lightning CLI.
+##### Option 4.1: Only enable trainer configuration from CLI
+
+This way, you only still have to provide the trainer configuration (via the `--config` flag) to the CLI, which often contains environment-specific settings like GPU indices, etc. To get more information on how this can be done, see [here](https://lightning.ai/docs/pytorch/stable/cli/lightning_cli_intermediate.html) for a crisp overview of the PyTorch Lightning CLI.
 
 ```python
 # file: main.py
@@ -242,7 +244,7 @@ from autolightning.datasets import MagicData
 from lightning.pytorch.cli import LightningCLI
 
 def cli_main():
-    cfg = ... # Load or set the configuration
+    cfg = ... # Load or set the configuration in any way you want
 
     LightningCLI(
         pre_cli(SupervisedLearner, cfg), # All arguments after cfg are available to be set in the CLI
@@ -255,23 +257,11 @@ if __name__ == "__main__":
     cli_main()
 ```
 
-### 3. Train the model
-
-If you have the model, data and trainer, you can train the model using the following code:
-
-```python
-trainer.fit(model, data)
-```
-
-In case you used the CLI, you can run the following command:
-
-```bash
-python main.py fit --config ./config.yaml
-```
-
-Where `config.yaml` for example looks like this:
+An example configuration for the trainer in this case could be:
 
 ```yaml
+# file: config.yaml
+
 trainer:
   logger:
     - class_path: WandbLogger
@@ -286,6 +276,78 @@ trainer:
   accelerator: gpu
   check_val_every_n_epoch: 1
   log_every_n_steps: 20
+```
+
+##### Option 4.1: Enable model, data and trainer configuration from CLI
+
+In this way, you store all the training, model and data configuration in one file. However, to stay consistent with the original Lightning CLI API, we use variable interpolation to avoid duplicate values in the YAML file (to enable this, we set `parser_kwargs={"parser_mode": "omegaconf"}`).
+
+```python
+# file: main.py
+
+from torch_mate.lightning import ConfigurableLightningModule, ConfigurableLightningDataModule
+
+from lightning.pytorch.cli import LightningCLI
+
+def cli_main():
+    LightningCLI(
+        ConfigurableLightningModule,
+        ConfigurableLightningDataModule,
+        subclass_mode_model=True,
+        subclass_mode_data=True,
+        parser_kwargs={"parser_mode": "omegaconf"}
+    )
+
+if __name__ == "__main__":
+    cli_main()
+```
+
+```yaml
+# file: config.yaml
+
+trainer:
+  max_epochs: ${model.init_args.cfg.training.max_epochs} # Reuse key
+  ...
+model:
+  class_path: autolightning.lm.SupervisedLearner
+  init_args:
+    # All variables in the this cfg variable below will be saved as hyperparameters,
+    # and can be accessed in the model via self.hparams. None of the other variables
+    # in this file will be saved as hyperparameters.
+    cfg:
+      criterion:
+      dataloaders:
+      dataset:
+        name: ${data.class_path} # Reuse key from class path to avoid duplicate configuration
+      learner:
+        name: ${model.class_path} # Same here
+      lr_scheduler:
+      model:
+      optimizer:
+      seed: ${seed_everything} # Same here
+      training:
+        max_epochs: 100
+    ...
+data:
+  class_path: your_module.YourDataModule
+  init_args:
+    cfg: ${model.init_args.cfg}
+    ...
+seed_everything: 4223747124
+```
+
+### 3. Train the model
+
+If you have the model, data and trainer, you can train the model using the following code:
+
+```python
+trainer.fit(model, data)
+```
+
+In case you used the CLI, you can run the following command:
+
+```bash
+python main.py fit --config ./config.yaml
 ```
 
 ## Customization
