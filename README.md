@@ -207,29 +207,16 @@ trainer, model, data = config_all(cfg,
 )
 ```
 
-#### Option 2: Create the objects manually
-
-```python
-from autolightning.lm import SupervisedLearner
-from autolightning.datasets import MagicData
-
-from lightning import Trainer
-
-# Create the model, data and trainer
-model = SupervisedLearner(cfg)
-data = MagicData(cfg)
-trainer = Trainer(**cfg["training"])
-```
-
-#### Option 3: Use the AutoLightning CLI (based on PyTorch Lightning CLI)
+#### Option 2: Use the AutoLightning CLI (based on PyTorch Lightning CLI)
 
 ```python
 # TO DO!
 ```
 
-#### Option 4: Use the original PyTorch Lightning CLI
+#### Option 3: Use the original PyTorch Lightning CLI
 
-##### Option 4.1: Only enable trainer configuration from CLI
+<details>
+    <summary>Option 3.1: Only enable trainer configuration from CLI</summary>
 
 This way, you only still have to provide the trainer configuration (via the `--config` flag) to the CLI, which often contains environment-specific settings like GPU indices, etc. To get more information on how this can be done, see [here](https://lightning.ai/docs/pytorch/stable/cli/lightning_cli_intermediate.html) for a crisp overview of the PyTorch Lightning CLI.
 
@@ -277,8 +264,10 @@ trainer:
   check_val_every_n_epoch: 1
   log_every_n_steps: 20
 ```
+</details>
 
-##### Option 4.1: Enable model, data and trainer configuration from CLI
+<details>
+    <summary>Option 3.2: Enable model, data and trainer configuration from CLI</summary>
 
 In this way, you store all the training, model and data configuration in one file. However, to stay consistent with the original Lightning CLI API, we use variable interpolation to avoid duplicate values in the YAML file (to enable this, we set `parser_kwargs={"parser_mode": "omegaconf"}`).
 
@@ -335,6 +324,25 @@ data:
     ...
 seed_everything: 4223747124
 ```
+</details>
+
+#### Option 4: Create the objects manually
+
+<details>
+    <summary>Show details</summary>
+
+```python
+from autolightning.lm import SupervisedLearner
+from autolightning.datasets import MagicData
+
+from lightning import Trainer
+
+# Create the model, data and trainer
+model = SupervisedLearner(cfg)
+data = MagicData(cfg)
+trainer = Trainer(**cfg["training"])
+```
+</details>
 
 ### 3. Train the model
 
