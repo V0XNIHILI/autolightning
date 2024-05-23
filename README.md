@@ -37,72 +37,71 @@ cfg = DotMap()
 
 # Specify the learner and its configuration
 # Without having any dots in the name, the import will be done from
-# the `torch_mate.lightning.lm` module
+# the `autolightning.lm` module
 cfg.learner.name = "SupervisedLearner"
-cfg.learner.cfg = DotMap({
+cfg.learner.cfg = {
     # Indicate whether classification accuracy should be computed
     "classification": True,
     # Optionally specify for which ks the top-k accuracy should be computed
     # "topk": [1, 5],
-})
+}
 
 # Select the criterion and its configuration
 cfg.criterion.name = 'CrossEntropyLoss'
 # Optionally specify the configuration for the criterion:
-# cfg.criterion.cfg = DotMap({
+# cfg.criterion.cfg = {
 #     'reduction': 'mean'
-# })
+# }
 
 # Optionally specify the learning rate scheduler and its configuration
-cfg.lr_scheduler.scheduler = DotMap({
+cfg.lr_scheduler.scheduler = {
     "name": "StepLR",
-    "cfg": DotMap({
+    "cfg": {
         "step_size": 2,
         "verbose": True,
-    }),
-})
+    },
+}
 
 # Specify the model and its configuration
 cfg.model.name = 'torch_mate.models.LeNet5BNMaxPool'
-cfg.model.cfg = DotMap({
-    'num_classes': 10
-})
+cfg.model.cfg.num_classes = 10
+
 # Optionally specify a compilation configuration
-cfg.model.extra.compile = DotMap({
+cfg.model.extra.compile = {
     'name': 'torch.compile'
-})
+}
 
 # Specify the optimizer and its configuration
 cfg.optimizer.name = 'Adam'
-cfg.optimizer.cfg = DotMap({"lr": 0.007})
+cfg.optimizer.cfg = {"lr": 0.007}
 
 # Specify the training configuration (passed directly to the PyTorch
 # Lightning Trainer). The `early_stopping` configuration is optional
 # and will be used to configure the early stopping callback.
-cfg.training = DotMap({
+cfg.training = {
     'max_epochs': 100,
-    'early_stopping': DotMap({
+    'early_stopping': {
         'monitor': 'val/loss',
         'patience': 10,
         'mode': 'min'
-    }),
-})
+    },
+}
 
 # Set the seed for reproducibility
 cfg.seed = 4223747124
 
 # Specify the dataset and its configuration.
 # Without having any dots in the name, the import will be done from
-# the `torch_mate.lightning.datasets` module
+# the `autolightning.datasets` module
 cfg.dataset.name = 'MagicData'
-cfg.dataset.cfg = DotMap({
+cfg.dataset.cfg = {
     "name": "MNIST", # Can also be torchvision.datasets.MNIST for example
     "val_percentage": 0.1
-})
-cfg.dataset.kwargs = DotMap({
+}
+cfg.dataset.kwargs = {
     "root": './data',
     "download": True
-})
+}
 
 # Specify the transforms and their configuration
 # Note that you can specify .pre (common pre-transform), .train
@@ -111,8 +110,8 @@ cfg.dataset.kwargs = DotMap({
 # then be built automatically. The same goes for target_transforms
 # via: cfg.dataset.target_transforms
 cfg.dataset.transforms.pre = [
-    DotMap({'name': 'ToTensor'}),
-    DotMap({'name': 'Resize', 'cfg': {'size': (28, 28)}}),
+    {'name': 'ToTensor'},
+    {'name': 'Resize', 'cfg': {'size': (28, 28)}},
 ]
 
 # Optionally, specify a pre-device and post-device transfer
@@ -122,17 +121,17 @@ cfg.dataset.transforms.pre = [
 
 # Specify the data loaders and their configuration (where default
 # is the fallback configuration for all data loaders)
-cfg.dataloaders = DotMap({
-    'default': DotMap({
+cfg.dataloaders = {
+    'default': {
         'num_workers': 4,
         'prefetch_factor': 16,
         'persistent_workers': True,
         'batch_size': 256,
-    }),
-    'train': DotMap({
+    },
+    'train': {
         'batch_size': 512
-    })
-})
+    }
+}
 ```
 
 The complete configuration dictionary will then look like this:
@@ -278,7 +277,7 @@ trainer:
 
 #### Hooks overview
 
-In case you want to add or override behavior of the defaults selected by TorchMate, this can be done by using hooks. TorchMate adds a few new hooks, next to the ones provided by PyTorch Lightning:
+In case you want to add or override behavior of the defaults selected by autolightning, this can be done by using hooks. autolightning adds a few new hooks, next to the ones provided by PyTorch Lightning:
 
 - `configure_configuration(self, cfg: Dict)`
     - Return the configuration that should be used. This configuration can be accessed at `self.hparams`.
@@ -327,7 +326,7 @@ class MyModel(AutoModule):
 
 #### Hooks overview
 
-Similar to models, you can customize the data loading behavior by using hooks. TorchMate adds the following new hooks:
+Similar to models, you can customize the data loading behavior by using hooks. autolightning adds the following new hooks:
 
 - `configure_configuration(self, cfg: Dict)`
 - `get_common_transform(self, moment: str)`
