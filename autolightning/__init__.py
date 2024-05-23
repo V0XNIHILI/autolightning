@@ -1,15 +1,15 @@
 from .AutoModule import AutoModule
 from .AutoDataModule import AutoDataModule
-from .configuration import configure_trainer, configure_data, configure_model, configure_model_data, configure_all
+from .config import config_trainer, config_data, config_model, config_model_data, config_all
 from .cli import pre_cli
 
 __all__ = [
     "AutoModule",
     "AutoDataModule",
-    "configure_trainer",
-    "configure_data",
-    "configure_model",
-    "configure_model_data",
-    "configure_all",
+    "config_trainer",
+    "config_data",
+    "config_model",
+    "config_model_data",
+    "config_all",
     "pre_cli"
 ]

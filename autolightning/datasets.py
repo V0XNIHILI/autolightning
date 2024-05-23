@@ -1,12 +1,11 @@
 from typing import Dict
 
 import torch
+from torch.utils.data import random_split
 import torchvision.datasets
 
-from torch_mate.lightning import AutoDataModule
-from torch_mate.lightning.utils import get_class_and_init
-
-from torch.utils.data import random_split
+from autolightning import AutoDataModule
+from autolightning.utils import get_class_and_init
 
 
 class MagicData(AutoDataModule):

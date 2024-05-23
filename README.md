@@ -8,7 +8,7 @@ My goal here is to achieve zero-code, pure from-configuration-only training of P
 
 ### Define the configuration
 
-To define a complete configuration, you can use the following top level keys:
+To define a complete configuration, you can use the following top-level keys:
 
 ```python
 cfg = {
@@ -178,9 +178,9 @@ cfg["model"]["name"] = LeNet5BNMaxPool
 ```python
 from lightning.pytorch.loggers import WandbLogger
 
-from autolightning import configure_all
+from autolightning import config_all
 
-trainer, model, data = configure_all(cfg,
+trainer, model, data = config_all(cfg,
     # Specify all keyworded arguments that are not part of the 
     # `cfg.training` dictionary for the PyTorch Lightning Trainer
     {
@@ -208,7 +208,7 @@ In case you want to add or override behavior of the defaults selected by TorchMa
 
 - `configure_configuration(self, cfg: Dict)`
     - Return the configuration that should be used. This configuration can be accessed at `self.hparams`.
-- `configure_model(self)`
+- `config_model(self)`
     - Return the model that should be trained. This model can be access with `get_model(self)`.
 - `compile_model(self, model: nn.Module)`
     - Compile the model and return it. This is called after the model is built and can be used to add change the compile behavior.
@@ -229,7 +229,7 @@ import torch.nn as nn
 from autolightning import AutoModule
 
 class MyModel(AutoModule):
-    def configure_model(self):
+    def config_model(self):
         # Can put any logic here and can access the configuration
         # via self.hparams
         return nn.Linear(100, 10)

@@ -25,6 +25,7 @@ def create_factory(cls, pre_applied_first_arg, return_annotation):
     
     return factory
 
+
 def pre_cli(module, cfg: Dict):
     # Get the method resolution order (MRO) of the class
     mro = inspect.getmro(module)

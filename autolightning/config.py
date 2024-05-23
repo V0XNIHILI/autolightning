@@ -4,10 +4,11 @@ from copy import deepcopy
 from lightning import Trainer
 import pytorch_lightning as pl
 
-import torch_mate.lightning.datasets
-import torch_mate.lightning.lm
 from torch_mate.utils import get_class_and_init
-from torch_mate.lightning.utils import build_trainer_kwargs
+
+import autolightning.datasets
+import autolightning.lm
+from autolightning.utils import build_trainer_kwargs
 
 
 def set_seed(cfg: Dict, set_seeds: bool):
@@ -15,7 +16,7 @@ def set_seed(cfg: Dict, set_seeds: bool):
         pl.seed_everything(cfg["seed"])
 
 
-def configure_trainer(cfg: Dict, **kwargs):
+def config_trainer(cfg: Dict, **kwargs):
     trainer_cfg = build_trainer_kwargs(cfg)
 
     if kwargs != {}:
@@ -24,7 +25,7 @@ def configure_trainer(cfg: Dict, **kwargs):
     return Trainer(**trainer_cfg)
 
 
-def configure_data(cfg: Dict, del_dataset_module_kwargs: bool = True, **kwargs):
+def config_data(cfg: Dict, del_dataset_module_kwargs: bool = True, **kwargs):
     name_and_config = {"name": cfg["dataset"]["name"]}
 
     all_kwargs = {}
@@ -40,10 +41,10 @@ def configure_data(cfg: Dict, del_dataset_module_kwargs: bool = True, **kwargs):
     if all_kwargs != {}:
         name_and_config["cfg"] = all_kwargs
     
-    return get_class_and_init(torch_mate.lightning.datasets, name_and_config, cfg)
+    return get_class_and_init(autolightning.datasets, name_and_config, cfg)
 
 
-def configure_model(cfg: Dict, **kwargs):
+def config_model(cfg: Dict, **kwargs):
     name_and_config = {"name": cfg["learner"]["name"]}
 
     all_kwargs = {}
@@ -56,24 +57,24 @@ def configure_model(cfg: Dict, **kwargs):
     if all_kwargs != {}:
         name_and_config["cfg"] = all_kwargs
     
-    return get_class_and_init(torch_mate.lightning.lm, name_and_config, cfg)
+    return get_class_and_init(autolightning.lm, name_and_config, cfg)
 
 
-def configure_model_data(cfg: Dict, model_kwargs: Optional[Dict] = None, data_kwargs: Optional[Dict] = None, del_dataset_module_kwargs: bool = True):
+def config_model_data(cfg: Dict, model_kwargs: Optional[Dict] = None, data_kwargs: Optional[Dict] = None, del_dataset_module_kwargs: bool = True):
     cfg = deepcopy(cfg)
 
     set_seed(cfg, True)
 
     # Instantiate data module before model module as the the dataset
     # module kwargs might be deleted from the config dictionary
-    data = configure_data(cfg, del_dataset_module_kwargs, **(data_kwargs if data_kwargs else {}))
-    model = configure_model(cfg, **(model_kwargs if model_kwargs else {}))
+    data = config_data(cfg, del_dataset_module_kwargs, **(data_kwargs if data_kwargs else {}))
+    model = config_model(cfg, **(model_kwargs if model_kwargs else {}))
 
     return model, data
 
 
-def configure_all(cfg: Dict, trainer_kwargs: Optional[Dict] = None, model_kwargs: Optional[Dict] = None, data_kwargs: Optional[Dict] = None, del_dataset_module_kwargs: bool = True):
-    model, data = configure_model_data(cfg, model_kwargs, data_kwargs, del_dataset_module_kwargs)
-    trainer = configure_trainer(cfg, **(trainer_kwargs if trainer_kwargs else {}))
+def config_all(cfg: Dict, trainer_kwargs: Optional[Dict] = None, model_kwargs: Optional[Dict] = None, data_kwargs: Optional[Dict] = None, del_dataset_module_kwargs: bool = True):
+    model, data = config_model_data(cfg, model_kwargs, data_kwargs, del_dataset_module_kwargs)
+    trainer = config_trainer(cfg, **(trainer_kwargs if trainer_kwargs else {}))
 
     return trainer, model, data

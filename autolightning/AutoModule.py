@@ -35,7 +35,7 @@ class AutoModule(L.LightningModule):
         - `self.predict_step(self, batch, batch_idx)`: calls `self.shared_step(batch, batch_idx, "predict")`
         - `self.configure_optimizers(self)`: creates the optimizer and scheduler based on the configuration dictionary
 
-        You can also override `self.configure_model(self)`, `self.configure_criteria(self)` and `self.configure_configuration(self, cfg: Dict)` to customize the model and criterion creation and the hyperparameter setting.
+        You can also override `self.config_model(self)`, `self.configure_criteria(self)` and `self.configure_configuration(self, cfg: Dict)` to customize the model and criterion creation and the hyperparameter setting.
 
         Args:
             cfg (Dict): configuration dictionary
@@ -45,7 +45,7 @@ class AutoModule(L.LightningModule):
 
         self.save_hyperparameters(self.configure_configuration(cfg))
 
-        self._model = self.compile_model(self.configure_model())
+        self._model = self.compile_model(self.config_model())
         self.criteria = self.configure_criteria()
 
     def log_key(self, phase: str, metric: str, metric_postfix: str = None):
@@ -65,7 +65,7 @@ class AutoModule(L.LightningModule):
     def configure_configuration(self, cfg: Dict):
         return cfg
 
-    def configure_model(self):
+    def config_model(self):
         return get_modules(None, self.hparams.model)
     
     def compile_model(self, model: nn.Module) -> nn.Module:

@@ -5,7 +5,7 @@ import lightning as L
 
 from torch.utils.data import DataLoader
 
-from torch_mate.lightning.utils import build_dataloader_kwargs, create_stage_transforms, build_transform
+from autolightning.utils import build_dataloader_kwargs, create_stage_transforms, build_transform
 from torch_mate.data.utils import Transformed, PreLoaded
 
 STAGES = ['train', 'val', 'test', 'predict']
