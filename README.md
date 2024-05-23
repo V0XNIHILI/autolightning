@@ -6,7 +6,7 @@ My goal here is to achieve zero-code, pure from-configuration-only training of P
 
 ## Example usage
 
-### Define the configuration
+### 1. Define the configuration
 
 To define a complete configuration, you can use the following top-level keys:
 
@@ -25,7 +25,7 @@ cfg = {
 
 ```
 
-For example, to train a LeNet5 on MNIST with early stopping and learning rate stepping, the configuration can be defined like below (note that I use `DotMap` here to define the configuration, but you can use any other dictionary-like object):
+For example, to train a LeNet5 on MNIST with early stopping and learning rate stepping, the configuration can be defined like below. Note that I use `DotMap` here to define the configuration, but you can use any other dictionary-like object, or use tools like OmegaConf or Hydra to define the configuration.
 
 ```python
 from dotmap import DotMap
@@ -173,13 +173,14 @@ class LeNet5BNMaxPool(nn.Module):
 cfg["model"]["name"] = LeNet5BNMaxPool
 ```
 
-### Get the model, data and trainer
+### 2. Get the model, data and trainer
 
 ```python
 from lightning.pytorch.loggers import WandbLogger
 
 from autolightning import config_all
 
+# Next to config_all, you can also use config_model, config_data and config_model_data to only configure specific parts
 trainer, model, data = config_all(cfg,
     # Specify all keyworded arguments that are not part of the 
     # `cfg.training` dictionary for the PyTorch Lightning Trainer
@@ -192,7 +193,7 @@ trainer, model, data = config_all(cfg,
 )
 ```
 
-### Train the model
+### 3. Train the model
 
 ```python
 trainer.fit(model, data)
