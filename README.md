@@ -2,6 +2,23 @@
 
 The goal of this project is to achieve zero-code, from-configuration-only training of PyTorch models using PyTorch Lightning. This is achieved by using a configuration dictionary that specifies the model, the dataset, the data loaders, etc. The configuration is then used to build all required objects. Currently, this leads to an average lines-of-code reduction of 15% compared to a standard PyTorch Lightning, while improving customizability + reproducibility and maintaining the same flexibility as the original code.
 
+## Installation
+
+To install the package, you can use the following command:
+
+```bash
+pip install git+https://github.com/V0XNIHILI/autolightning.git@main
+```
+
+Or, if you want to install the package in editable mode, you can use the following command:
+
+```bash
+git clone git@github.com:V0XNIHILI/autolightning.git
+cd autolightning
+# Make sure you have pip 23 or higher
+pip install -e .
+```
+
 ## Example usage
 
 ### 1. Define the configuration
