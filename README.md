@@ -1,8 +1,6 @@
 # autolightning
 
-## Main idea
-
-My goal here is to achieve zero-code, pure from-configuration-only training of PyTorch models using PyTorch Lightning. This is achieved by using a configuration dictionary that specifies the model, the dataset, the data loaders, etc. The configuration is then used to build all required objects. Currently, this leads to an average lines-of-code reduction of 15% compared to a standard PyTorch Lightning, while improving customizability + reproducibility and maintaining the same flexibility as the original code.
+The goal of this project is to achieve zero-code, from-configuration-only training of PyTorch models using PyTorch Lightning. This is achieved by using a configuration dictionary that specifies the model, the dataset, the data loaders, etc. The configuration is then used to build all required objects. Currently, this leads to an average lines-of-code reduction of 15% compared to a standard PyTorch Lightning, while improving customizability + reproducibility and maintaining the same flexibility as the original code.
 
 ## Example usage
 
@@ -17,6 +15,7 @@ cfg = {
     "lr_scheduler": {...}, # Optional
     "model": {...},
     "optimizer": {...},
+
     "training": {...}, # Optional
     "seed": ..., # Optional
     "dataset": {...}, # Optional
@@ -25,7 +24,11 @@ cfg = {
 
 ```
 
-For example, to train a LeNet5 on MNIST with early stopping and learning rate stepping, the configuration can be defined like below. Note that I use `DotMap` here to define the configuration, but you can use any other dictionary-like object, or use tools like OmegaConf or Hydra to define the configuration.
+For example, to train a LeNet5 on MNIST with early stopping and learning rate stepping, the configuration can be defined in one of the following ways:
+
+#### Option 1: A (regular) dictionary
+
+Note that I use `DotMap` here to define the configuration, but you can use any other dictionary-like object, or use tools like OmegaConf or Hydra to define the configuration.
 
 ```python
 from dotmap import DotMap
@@ -130,32 +133,13 @@ cfg.dataloaders = DotMap({
         'batch_size': 512
     })
 })
-
-cfg = cfg.toDict()
 ```
 
 The complete configuration dictionary will then look like this:
 
 ```python
-{'learner': {'name': 'SupervisedLearner', 'cfg': {'classification': True}},
- 'criterion': {'name': 'CrossEntropyLoss'},
- 'lr_scheduler': {'scheduler': {'name': 'StepLR',
-   'cfg': {'step_size': 2, 'verbose': True}}},
- 'model': {'name': 'torch_mate.models.LeNet5BNMaxPool',
-  'cfg': {'num_classes': 10}},
- 'optimizer': {'name': 'Adam', 'cfg': {'lr': 0.007}},
- 'training': {'max_epochs': 100,
-  'early_stopping': {'monitor': 'val/loss', 'patience': 10, 'mode': 'min'}},
- 'seed': 4223747124,
- 'dataset': {'name': 'MNISTData',
-  'kwargs': {'root': './data'},
-  'transforms': {'pre': [{'name': 'ToTensor'},
-    {'name': 'Resize', 'cfg': {'size': (28, 28)}}]}},
- 'dataloaders': {'default': {'num_workers': 4,
-   'prefetch_factor': 16,
-   'persistent_workers': True,
-   'batch_size': 256},
-  'train': {'batch_size': 512}}}
+>>> cfg.toDict()
+{'learner': {'name': 'SupervisedLearner', 'cfg': {'classification': True}}, 'criterion': {'name': 'CrossEntropyLoss'}, 'lr_scheduler': {'scheduler': {'name': 'StepLR', 'cfg': {'step_size': 2, 'verbose': True}}}, 'model': {'name': 'torch_mate.models.LeNet5BNMaxPool', 'cfg': {'num_classes': 10}, 'extra': {'compile': {'name': 'torch.compile'}}}, 'optimizer': {'name': 'Adam', 'cfg': {'lr': 0.007}}, 'training': {'max_epochs': 100, 'early_stopping': {'monitor': 'val/loss', 'patience': 10, 'mode': 'min'}}, 'seed': 4223747124, 'dataset': {'name': 'MagicData', 'cfg': {'name': 'MNIST', 'val_percentage': 0.1}, 'kwargs': {'root': './data', 'download': True}, 'transforms': {'pre': [{'name': 'ToTensor'}, {'name': 'Resize', 'cfg': {'size': (28, 28)}}]}}, 'dataloaders': {'default': {'num_workers': 4, 'prefetch_factor': 16, 'persistent_workers': True, 'batch_size': 256}, 'train': {'batch_size': 512}}}
 ```
 
 Note that the configuration can also contain references to classes directly, without the relative import path. This is practical for example when you define a model class in the same file as the configuration. For example:
@@ -170,10 +154,24 @@ class LeNet5BNMaxPool(nn.Module):
         ...
 
 
-cfg["model"]["name"] = LeNet5BNMaxPool
+cfg.model.name = LeNet5BNMaxPool
 ```
 
+Finally, serialize the resulting configuration to a dictionary:
+
+```python
+cfg = cfg.toDict()
+```
+
+#### Option 2: a YAML file
+
+#### Option 3: OmegaConf
+
+#### Option 4: Hydra
+
 ### 2. Get the model, data and trainer
+
+#### Option 1: Let `autolightning` do the work
 
 ```python
 from lightning.pytorch.loggers import WandbLogger
@@ -191,6 +189,26 @@ trainer, model, data = config_all(cfg,
         "logger": WandbLogger(project="test_wandb_lightning")
     }
 )
+```
+
+#### Option 2: Create the objects separately based on fixed classes
+
+```python
+from autolightning.lm import SupervisedLearner
+from autolightning.datasets import MagicData
+
+from lightning import Trainer
+
+# Create the model, data and trainer
+model = SupervisedLearner(cfg)
+data = MagicData(cfg)
+trainer = Trainer(**cfg.training)
+```
+
+#### Option 3: Use the CLI
+
+```python
+# TO DO!
 ```
 
 ### 3. Train the model
