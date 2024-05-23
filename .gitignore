@@ -1,0 +1,17 @@
+# Python
+
+__pycache__
+
+venv
+
+*.egg-info/
+
+# Testing & debugging
+
+wandb
+data
+lightning_logs
+
+# macOS
+
+.DS_Store
