@@ -151,13 +151,6 @@ cfg.dataloaders = {
 }
 ```
 
-The complete configuration dictionary will then look like this:
-
-```python
->>> cfg.toDict()
-{'learner': {'name': 'SupervisedLearner', 'cfg': {'classification': True}}, 'criterion': {'name': 'CrossEntropyLoss'}, 'lr_scheduler': {'scheduler': {'name': 'StepLR', 'cfg': {'step_size': 2, 'verbose': True}}}, 'model': {'name': 'torch_mate.models.LeNet5BNMaxPool', 'cfg': {'num_classes': 10}, 'extra': {'compile': {'name': 'torch.compile'}}}, 'optimizer': {'name': 'Adam', 'cfg': {'lr': 0.007}}, 'training': {'max_epochs': 100, 'early_stopping': {'monitor': 'val/loss', 'patience': 10, 'mode': 'min'}}, 'seed': 4223747124, 'dataset': {'name': 'MagicData', 'cfg': {'name': 'MNIST', 'val_percentage': 0.1}, 'kwargs': {'root': './data', 'download': True}, 'transforms': {'pre': [{'name': 'ToTensor'}, {'name': 'Resize', 'cfg': {'size': (28, 28)}}]}}, 'dataloaders': {'default': {'num_workers': 4, 'prefetch_factor': 16, 'persistent_workers': True, 'batch_size': 256}, 'train': {'batch_size': 512}}}
-```
-
 Note that the configuration can also contain references to classes directly, without the relative import path. This is practical for example when you define a model class in the same file as the configuration. For example:
 
 ```python
@@ -295,10 +288,10 @@ if __name__ == "__main__":
 # file: config.yaml
 
 trainer:
-  max_epochs: ${model.init_args.cfg.training.max_epochs} # Reuse key
+  max_epochs: ${model.init_args.cfg.training.max_epochs}
   ...
 model:
-  class_path: autolightning.lm.SupervisedLearner
+  class_path: ${model.init_args.cfg.learner.name}
   init_args:
     # All variables in the this cfg variable below will be saved as hyperparameters,
     # and can be accessed in the model via self.hparams. None of the other variables
@@ -307,22 +300,22 @@ model:
       criterion:
       dataloaders:
       dataset:
-        name: ${data.class_path} # Reuse key from class path to avoid duplicate configuration
+        name: your_module.YourDataModule
       learner:
-        name: ${model.class_path} # Same here
+        name: autolightning.lm.SupervisedLearner
       lr_scheduler:
       model:
       optimizer:
-      seed: ${seed_everything} # Same here
+      seed: 4223747124
       training:
         max_epochs: 100
     ...
 data:
-  class_path: your_module.YourDataModule
+  class_path: ${model.init_args.cfg.dataset.name}
   init_args:
     cfg: ${model.init_args.cfg}
     ...
-seed_everything: 4223747124
+seed_everything: ${model.init_args.cfg.seed}
 ```
 </details>
 
@@ -346,7 +339,7 @@ trainer = Trainer(**cfg["training"])
 
 ### 3. Train the model
 
-If you have the model, data and trainer, you can train the model using the following code:
+If you have the model, data and trainer instantiated, you can train the model using the following code:
 
 ```python
 trainer.fit(model, data)

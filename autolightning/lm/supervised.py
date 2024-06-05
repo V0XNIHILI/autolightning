@@ -1,4 +1,4 @@
-from torch_mate.lightning import AutoModule
+from autolightning import AutoModule
 
 import torch_mate.lightning.lm.functional.supervised as LFSupervised
 

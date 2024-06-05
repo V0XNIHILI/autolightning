@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-from torch_mate.lightning import AutoModule
+from autolightning import AutoModule
 
 from torch_mate.utils import calc_accuracy
 
