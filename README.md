@@ -182,12 +182,13 @@ cfg = cfg.toDict()
 
 #### Option 1: Let `autolightning` do the work (for example in notebooks or embedded in other scripts)
 
+Use `config_all` to configure the model, data and trainer in one go. This function returns the trainer, model and data objects, which can be used to train the model. Alternatively, you can also use `config_model`, `config_data` and `config_model_data` to only configure specific parts.
+
 ```python
 from lightning.pytorch.loggers import WandbLogger
 
 from autolightning import config_all
 
-# Next to config_all, you can also use config_model, config_data and config_model_data to only configure specific parts
 trainer, model, data = config_all(cfg,
     # Specify all keyworded arguments that are not part of the 
     # `cfg.training` dictionary for the PyTorch Lightning Trainer
@@ -200,16 +201,32 @@ trainer, model, data = config_all(cfg,
 )
 ```
 
-#### Option 2: Use the AutoLightning CLI (based on PyTorch Lightning CLI)
+#### Option 3: Create the objects manually
+
+By creating the objects manually, you will have more flexibility and can decide which objects are created with autolightning and which you create by yourself. For example, in this way, you can combine a custom model configured via autolightning with a regular PyTorch dataloader.
+
+```python
+from autolightning.lm import SupervisedLearner
+from autolightning.datasets import MagicData
+
+from lightning import Trainer
+
+# Create the model, data and trainer
+model = SupervisedLearner(cfg)
+data = MagicData(cfg)
+trainer = Trainer(**cfg["training"])
+```
+
+#### Option 3: Use the AutoLightning CLI (based on PyTorch Lightning CLI)
 
 ```python
 # TO DO!
 ```
 
-#### Option 3: Use the original PyTorch Lightning CLI
+#### Option 4: Use the original PyTorch Lightning CLI
 
 <details>
-    <summary>Option 3.1: Only enable trainer configuration from CLI</summary>
+    <summary>Option 4.1: Only enable trainer configuration from CLI</summary>
 
 This way, you only still have to provide the trainer configuration (via the `--config` flag) to the CLI, which often contains environment-specific settings like GPU indices, etc. To get more information on how this can be done, see [here](https://lightning.ai/docs/pytorch/stable/cli/lightning_cli_intermediate.html) for a crisp overview of the PyTorch Lightning CLI.
 
@@ -256,11 +273,13 @@ trainer:
   accelerator: gpu
   check_val_every_n_epoch: 1
   log_every_n_steps: 20
+data:
+  root: ./data
 ```
 </details>
 
 <details>
-    <summary>Option 3.2: Enable model, data and trainer configuration from CLI</summary>
+    <summary>Option 4.2: Enable model, data and trainer configuration from CLI</summary>
 
 In this way, you store all the training, model and data configuration in one file. However, to stay consistent with the original Lightning CLI API, we use variable interpolation to avoid duplicate values in the YAML file (to enable this, we set `parser_kwargs={"parser_mode": "omegaconf"}`).
 
@@ -316,24 +335,6 @@ data:
     cfg: ${model.init_args.cfg}
     ...
 seed_everything: ${model.init_args.cfg.seed}
-```
-</details>
-
-#### Option 4: Create the objects manually
-
-<details>
-    <summary>Show details</summary>
-
-```python
-from autolightning.lm import SupervisedLearner
-from autolightning.datasets import MagicData
-
-from lightning import Trainer
-
-# Create the model, data and trainer
-model = SupervisedLearner(cfg)
-data = MagicData(cfg)
-trainer = Trainer(**cfg["training"])
 ```
 </details>
 
