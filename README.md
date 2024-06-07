@@ -267,7 +267,7 @@ In this way, you store all the training, model and data configuration in one fil
 ```python
 # file: main.py
 
-from torch_mate.lightning import ConfigurableLightningModule, ConfigurableLightningDataModule
+from autolightning import ConfigurableLightningModule, ConfigurableLightningDataModule
 
 from lightning.pytorch.cli import LightningCLI
 
