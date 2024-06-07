@@ -107,6 +107,9 @@ class AutoModule(L.LightningModule):
                     if key != "scheduler":
                         schedulers[i][key] = sched_cfg[key]
 
+                if 'monitor' not in schedulers[i]:
+                    schedulers[i]['monitor'] = self.log_key("val", "loss")
+
         return schedulers
 
     def configure_optimizers(self) -> OptimizerLRScheduler:
