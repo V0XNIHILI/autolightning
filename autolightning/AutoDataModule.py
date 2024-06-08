@@ -49,7 +49,7 @@ class AutoDataModule(L.LightningDataModule):
     def get_common_target_transform(self, moment: str):
         return build_transform(self.hparams.dataset.get("target_transforms", {}).get(moment, []))
     
-    def get_common_batch_transform(self, moment: str):
+    def get_batch_transform(self, moment: str):
         return build_transform(self.hparams.dataset.get("batch_transforms", {}).get(moment, []))
 
     def get_transform(self, stage: str):
@@ -68,14 +68,6 @@ class AutoDataModule(L.LightningDataModule):
                 self.hparams.dataset["target_transforms"].get(stage, None),
                 self._common_pre_target_transforms if stage in STAGES else None,
                 self._common_post_target_transforms if stage in STAGES else None
-            )
-        
-        return None
-    
-    def get_batch_transform(self, moment: str):
-        if "batch_transforms" in self.hparams.dataset:
-            return build_transform(
-                self.hparams.dataset["batch_transforms"].get(moment, [])
             )
         
         return None
