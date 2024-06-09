@@ -12,12 +12,11 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-keywords = ["tools", "utils", "machine learning", "ml", "ai", "pytorch", "torch", "python", "lightning", "automl", "hydra]
+keywords = ["tools", "utils", "machine learning", "ml", "ai", "pytorch", "torch", "python", "lightning", "automl", "hydra"]
 dependencies = [
   'torch',
   'torchvision',
   'lightning',
-  'git+https://github.com/V0XNIHILI/torch-mate.git@main'
 ]
 
 [build-system]
