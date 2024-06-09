@@ -20,6 +20,9 @@ dependencies = [
   'git+https://github.com/V0XNIHILI/torch-mate.git@main'
 ]
 
+[project.scripts]
+autolightning = "autolightning.main:main"
+
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
