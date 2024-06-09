@@ -17,6 +17,7 @@ dependencies = [
   'torch',
   'torchvision',
   'lightning',
+  'git+https://github.com/V0XNIHILI/torch-mate.git@main'
 ]
 
 [build-system]
