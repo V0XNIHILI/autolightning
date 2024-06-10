@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [project.scripts]
-autolightning = "autolightning.main:main"
+autolightning = "autolightning.cli:main"
 
 [build-system]
 requires = ["setuptools"]
