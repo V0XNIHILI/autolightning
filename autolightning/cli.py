@@ -2,7 +2,7 @@ import sys
 import os
 import tempfile
 import yaml
-from typing import Dict, Any
+from typing import Dict, Any, Union, List, Tuple
 
 import inspect
 from functools import wraps
@@ -63,6 +63,18 @@ def write_to_temp_file(content):
         temp_file.close()
 
 
+def replace_tuples_with_lists(obj: Union[Dict, List, Tuple]):
+    """Recursively replace all tuples in a nested dictionary or list with lists."""
+    if isinstance(obj, dict):
+        return {k: replace_tuples_with_lists(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [replace_tuples_with_lists(elem) for elem in obj]
+    elif isinstance(obj, tuple):
+        return list(obj)
+    else:
+        return obj
+
+
 class ActionConfigFilePython(ActionConfigFile):
     """ActionConfigFile with support for configurations stored in Python files with variable name `self.config_var_name` (default: 'cfg')."""
 
@@ -112,6 +124,12 @@ class ActionConfigFilePython(ActionConfigFile):
             if "seed" in dict_variable:
                 yaml_contents["seed_everything"] = dict_variable["seed"]
 
+            # Loop through all nested keys and replace all tuples with lists
+            # as jsonargparse's implementation of YAML loading does not support tuples
+            # (see line _loaders_dumpers.py#L19 in jsonargparse project where they
+            # use a SafeLoader instead of a FullLoader which supports tuples)
+            yaml_contents = replace_tuples_with_lists(yaml_contents)
+
             # Write the contents to a temporary file
             temp_file_path = write_to_temp_file(yaml.dump(yaml_contents))
 
@@ -145,7 +163,8 @@ def main():
         AutoDataModule,
         subclass_mode_model=True,
         subclass_mode_data=True,
-        save_config_kwargs={"overwrite": True}
+        save_config_kwargs={"overwrite": True},
+        parser_kwargs={"parser_mode": "omegaconf"}
     )
 
 if __name__ == "__main__":
