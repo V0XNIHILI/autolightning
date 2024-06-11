@@ -15,6 +15,8 @@ import lightning.pytorch as pl
 
 from autolightning import AutoModule, AutoDataModule
 
+from torch_mate.utils import disable_torch_debug_apis, configure_cuda
+
 
 def create_factory(cls, pre_applied_first_arg, return_annotation):
     # Get the signature of the __init__ method, excluding 'self'
@@ -155,6 +157,42 @@ class AutoCLI(LightningCLI):
         )
 
         return parser
+    
+    def add_arguments_to_parser(self, parser: LightningArgumentParser) -> None:
+        # Add arguments for disable_torch_debug_apis
+        parser.add_argument("--torch.autograd.set_detect_anomaly", type=bool, default=False, help="Whether to detect anomalies.")
+        parser.add_argument("--torch.autograd.profiler.profile", type=bool, default=True, help="Whether to profile.")
+        parser.add_argument("--torch.autograd.profiler.emit_nvtx", type=bool, default=True, help="Whether to emit nvtx.")
+
+        # Add arguments for configure_cuda
+        parser.add_argument("--torch.set_float32_matmul_precision", type=str, default='highest', help="Precision of float32 matmul (highest, high, medium).")
+        parser.add_argument("--torch.backends.cuda.matmul.allow_tf32", type=bool, default=False, help="Allow TF32 matmul.")
+        parser.add_argument("--torch.backends.cudnn.allow_tf32", type=bool, default=True, help="Allow TF32 cuDNN operations.")
+        parser.add_argument("--torch.backends.cudnn.benchmark", type=bool, default=False, help="Use cuDNN benchmark mode.")
+    
+    def before_instantiate_classes(self):
+        # Get the configuration
+        cfg = self.config[self.config.subcommand]
+
+        torch_cfg = cfg["torch"]
+        torch_autograd_cfg = torch_cfg["autograd"]
+        torch_backends_cfg = torch_cfg["backends"]
+        torch_backends_cudnn_cfg = torch_backends_cfg["cudnn"]
+
+        # Disable PyTorch debug APIs
+        disable_torch_debug_apis(
+            torch_autograd_cfg["set_detect_anomaly"],
+            torch_autograd_cfg["profiler"]["profile"],
+            torch_autograd_cfg["profiler"]["emit_nvtx"]
+        )
+
+        # Configure CUDA
+        configure_cuda(
+            torch_cfg["set_float32_matmul_precision"],
+            torch_backends_cfg["cuda"]["matmul"]["allow_tf32"],
+            torch_backends_cudnn_cfg["allow_tf32"],
+            torch_backends_cudnn_cfg["benchmark"]
+        )
 
 
 def main():
