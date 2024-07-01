@@ -244,24 +244,23 @@ to train the network as specified in the `main.py` file. The `autolightning` CLI
 
 1. Configurations can also be specified as Python files (instead of in YAML files)
 2. The AutoCLI has additional `torch` flags that can be set in a configuration file to configure the PyTorch backend regarding debugging and performance. For example:
-
-```yaml
-...
-torch:
-  autograd:
-    set_detect_anomaly: False
-    profiler:
-      profile: False
-      emit_nvtx: False
-  set_float32_matmul_precision: high
-  backends:
-    cuda:
-      matmul:
+    ```yaml
+    ...
+    torch:
+    autograd:
+        set_detect_anomaly: False
+        profiler:
+        profile: False
+        emit_nvtx: False
+    set_float32_matmul_precision: high
+    backends:
+        cuda:
+        matmul:
+            allow_tf32: True
+        cudnn:
         allow_tf32: True
-    cudnn:
-      allow_tf32: True
-      benchmark: True
-```
+        benchmark: True
+    ```
 
 You can also split hyperparameter configuration from per-machine specific configuration by moving the latter into a separate (YAML) config file, for example:
 
