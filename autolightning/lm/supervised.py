@@ -1,6 +1,6 @@
 from autolightning import AutoModule
 
-import torch_mate.lightning.lm.functional.supervised as LFSupervised
+import autolightning.lm.functional.supervised as LFSupervised
 
 class SupervisedLearner(AutoModule):
     log_metrics = {"loss": "loss", "accuracy": "accuracy"}
