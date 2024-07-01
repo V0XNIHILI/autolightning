@@ -234,13 +234,9 @@ trainer = Trainer(**cfg["training"])
 
 #### Option 3: Use the AutoLightning CLI (based on PyTorch Lightning CLI)
 
-Simply run:
+You can immediately continue with [step 3 - train the model](#3-train-the-model).
 
-```bash
-autolightning fit -c main.py
-```
-
-to train the network as specified in the `main.py` file. The `autolightning` CLI tool supports all the same arguments as the regular PyTorch Lightning CLI (as the `AutoCLI` is a subclass of the `LightningCLI`) but allows for two key differences:
+Note thattThe `autolightning` CLI tool supports all the same arguments as the regular PyTorch Lightning CLI (as the `AutoCLI` is a subclass of the `LightningCLI`) but allows for two key differences:
 
 1. Configurations can also be specified as Python files (instead of in YAML files)
 2. The AutoCLI has additional `torch` flags that can be set in a configuration file to configure the PyTorch backend regarding debugging and performance. For example:
@@ -419,10 +415,10 @@ If you have the model, data and trainer instantiated, you can train the model us
 trainer.fit(model, data)
 ```
 
-Or, if you want to use the original PyTorch Lightning CLI, you can run the following command:
+Or if you want to use the AutoLightning CLI, you can run the following command:
 
 ```bash
-autolighting fit --config ./full_cfg.py --config trainer_data_config.yaml
+autolighting fit --config main.py --config local.yaml
 ```
 
 Finally, in case you used the original PyTorch Lightning CLI in your own code, you can run the following command:
