@@ -9,7 +9,7 @@ from autolightning.utils import get_class_and_init
 
 
 class MagicData(AutoDataModule):
-    def __init__(self, cfg: Dict, **kwargs):
+    def __init__(self, cfg: Dict, root: str, **kwargs):
         """Support any dataset with the following call signature:
 
         ```python
@@ -34,10 +34,8 @@ class MagicData(AutoDataModule):
 
         super().__init__(cfg)
 
-        self.root = kwargs["root"]
-
-        remaining_kwargs = {k: v for k, v in kwargs.items() if k != "root"}
-        self.name_and_config = {"name": self.hparams.dataset["cfg"]["name"], "cfg": remaining_kwargs}
+        self.root = root
+        self.name_and_config = {"name": self.hparams.dataset["cfg"]["name"], "cfg": kwargs}
 
     def prepare_data(self) -> None:
         get_class_and_init(torchvision.datasets, self.name_and_config, self.root, False)
