@@ -97,7 +97,7 @@ class AutoDataModule(L.LightningDataModule):
         if transform is None and target_transform is None:
             return dataset
         
-        return Transformed(dataset, self.get_transform(phase), self.get_target_transform(phase))
+        return Transformed(dataset, transform, target_transform)
     
     def get_dataloader(self, phase: str):
         dataset = self.get_transformed_dataset(phase)
