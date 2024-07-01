@@ -285,7 +285,6 @@ trainer:
         mode: max
         save_on_train_epoch_end: false
         save_top_k: 1
-    # - class_path: metalarena.datasets.CB.DisableOptimizationCallback
   accelerator: gpu
   check_val_every_n_epoch: 10
   devices: [3]
