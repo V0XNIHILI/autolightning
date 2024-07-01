@@ -48,6 +48,9 @@ For example, to train a LeNet5 on MNIST with early stopping and learning rate st
 Note that I use `DotMap` here to define the configuration, but you can use any other dictionary-like object, or use tools like OmegaConf or Hydra to define the configuration.
 
 ```python
+# filename: main.py
+# -----------------
+
 from dotmap import DotMap
 
 cfg = DotMap()
@@ -174,9 +177,21 @@ cfg = cfg.toDict()
 
 #### Option 2: a YAML file
 
+```python
+# TO DO!
+```
+
 #### Option 3: OmegaConf
 
+```python
+# TO DO!
+```
+
 #### Option 4: Hydra
+
+```python
+# TO DO!
+```
 
 ### 2. Get the model, data and trainer
 
@@ -219,11 +234,16 @@ trainer = Trainer(**cfg["training"])
 
 #### Option 3: Use the AutoLightning CLI (based on PyTorch Lightning CLI)
 
-```python
-# TO DO!
+Simply run:
+
+```bash
+autolightning fit -c main.py
 ```
 
-Also, the AutoCLI has additional `torch` flags that can be set in a configuration file to configure the PyTorch backend regarding debugging and performance. For example:
+to train the network as specified in the `main.py` file. The `autolightning` CLI tool supports all the same arguments as the regular PyTorch Lightning CLI (as the `AutoCLI` is a subclass of the `LightningCLI`) but allows for two key differences:
+
+1. Configurations can also be specified as Python files (instead of in YAML files)
+2. The AutoCLI has additional `torch` flags that can be set in a configuration file to configure the PyTorch backend regarding debugging and performance. For example:
 
 ```yaml
 ...
@@ -241,6 +261,41 @@ torch:
     cudnn:
       allow_tf32: True
       benchmark: True
+```
+
+You can also split hyperparameter configuration from per-machine specific configuration by moving the latter into a separate (YAML) config file, for example:
+
+```yaml
+# filename: local.yaml
+# --------------------
+
+data:
+  # Don't forget to remove these keys from main.py!
+  root: "../datasets/data"
+  download: True
+trainer:
+  logger:
+    - class_path: WandbLogger
+      init_args:
+        project: name_of_wandb_project
+        log_model: true
+  callbacks:
+    - class_path: ModelCheckpoint
+      init_args:
+        monitor: val/accuracy
+        mode: max
+        save_on_train_epoch_end: false
+        save_top_k: 1
+    # - class_path: metalarena.datasets.CB.DisableOptimizationCallback
+  accelerator: gpu
+  check_val_every_n_epoch: 10
+  devices: [3]
+```
+
+To run training on the combined configuration (where only the values in `main.py` are stored as hyperparemeters):
+
+```bash
+autolightning fit -c main.py  -c local.yaml
 ```
 
 #### Option 4: Use the original PyTorch Lightning CLI
