@@ -223,12 +223,32 @@ trainer = Trainer(**cfg["training"])
 # TO DO!
 ```
 
+Also, the AutoCLI has additional `torch` flags that can be set in a configuration file to configure the PyTorch backend regarding debugging and performance. For example:
+
+```yaml
+...
+torch:
+  autograd:
+    set_detect_anomaly: False
+    profiler:
+      profile: False
+      emit_nvtx: False
+  set_float32_matmul_precision: high
+  backends:
+    cuda:
+      matmul:
+        allow_tf32: True
+    cudnn:
+      allow_tf32: True
+      benchmark: True
+```
+
 #### Option 4: Use the original PyTorch Lightning CLI
 
 <details>
-    <summary>Option 4.1: Only enable trainer configuration from CLI</summary>
+    <summary>Option 4.1: Only enable trainer configuration + data/model kwargs from CLI</summary>
 
-This way, you only still have to provide the trainer configuration (via the `--config` flag) to the CLI, which often contains environment-specific settings like GPU indices, etc. To get more information on how this can be done, see [here](https://lightning.ai/docs/pytorch/stable/cli/lightning_cli_intermediate.html) for a crisp overview of the PyTorch Lightning CLI.
+This way, you only still have to provide the trainer configuration (via the `--config` flag) to the CLI, which often contains environment-specific settings like GPU indices, etc. while keeping experiment-specific settings fixed. To get more information on how this can be done, see [here](https://lightning.ai/docs/pytorch/stable/cli/lightning_cli_intermediate.html) for a crisp overview of the PyTorch Lightning CLI.
 
 ```python
 # file: main.py
@@ -279,7 +299,7 @@ data:
 </details>
 
 <details>
-    <summary>Option 4.2: Enable model, data and trainer configuration from CLI</summary>
+    <summary>Option 4.2 (not recommended): Enable model, data and trainer configuration from CLI</summary>
 
 In this way, you store all the training, model and data configuration in one file. However, to stay consistent with the original Lightning CLI API, we use variable interpolation to avoid duplicate values in the YAML file (to enable this, we set `parser_kwargs={"parser_mode": "omegaconf"}`).
 
@@ -346,7 +366,13 @@ If you have the model, data and trainer instantiated, you can train the model us
 trainer.fit(model, data)
 ```
 
-In case you used the CLI, you can run the following command:
+Or, if you want to use the original PyTorch Lightning CLI, you can run the following command:
+
+```bash
+autolighting fit --config ./full_cfg.py --config trainer_data_config.yaml
+```
+
+Finally, in case you used the original PyTorch Lightning CLI in your own code, you can run the following command:
 
 ```bash
 python main.py fit --config ./config.yaml
