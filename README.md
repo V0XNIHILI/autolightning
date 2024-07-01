@@ -216,7 +216,7 @@ trainer, model, data = config_all(cfg,
 )
 ```
 
-#### Option 3: Create the objects manually
+#### Option 2: Create the objects manually
 
 By creating the objects manually, you will have more flexibility and can decide which objects are created with autolightning and which you create by yourself. For example, in this way, you can combine a custom model configured via autolightning with a regular PyTorch dataloader.
 
