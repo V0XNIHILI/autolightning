@@ -130,19 +130,19 @@ def process_metric_learning_batch(embedder: nn.Module, batch: MetaBatch,
     return meta_error / meta_batch_size, (accuracy, confidence_interval)
 
 
-def shared_step(module: AutoModule, batch, batch_idx, stage: str):
+def shared_step(module: AutoModule, batch, batch_idx, phase: str):
     loss, (accuracy, confidence_interval) = process_metric_learning_batch(
         module, batch, module.hparams.learner["cfg"]["metric"],
         module.hparams.learner["cfg"]["average_support_embeddings"],
         None, module.criteria)
     
     log_dict = {
-        module.log_key(f"meta_{stage}", "loss"): loss,
-        module.log_key(f"meta_{stage}", "accuracy"): accuracy
+        module.log_key(f"meta_{phase}", "loss"): loss,
+        module.log_key(f"meta_{phase}", "accuracy"): accuracy
     }
 
     if module.hparams.learner["cfg"]["log_confidence_interval"]:
-        log_dict[module.log_key(f"meta_{stage}", "accuracy@95%")] = confidence_interval
+        log_dict[module.log_key(f"meta_{phase}", "accuracy@95%")] = confidence_interval
     
     module.log_dict(log_dict)
     

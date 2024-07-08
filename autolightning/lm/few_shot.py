@@ -9,13 +9,13 @@ class PrototypicalLearner(AutoModule):
     def __init__(self, cfg: Dict):
         super().__init__(cfg)
 
-        few_shot_stages = ["meta_train", "meta_val", "meta_test"]
+        few_shot_phases = ["meta_train", "meta_val", "meta_test"]
 
-        for stage in few_shot_stages:
-            self.log_stages[stage] = stage
+        for phase in few_shot_phases:
+            self.log_phases[phase] = phase
 
-    def shared_step(self, batch, batch_idx, stage: str):
-        return LFPrototypical.shared_step(self, batch, batch_idx, stage)
+    def shared_step(self, batch, batch_idx, phase: str):
+        return LFPrototypical.shared_step(self, batch, batch_idx, phase)
     
     def config_model(self):
         model = super().config_model()

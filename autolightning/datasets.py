@@ -60,12 +60,12 @@ class MagicData(AutoDataModule):
         else:
             raise ValueError(f"Unsupported stage: {stage}")
 
-    def get_dataset(self, stage: str):
-        if stage == 'train':
+    def get_dataset(self, phase: str):
+        if phase == 'train':
             return self.train_set
-        elif stage == 'val':
+        elif phase == 'val':
             return self.val_set
-        elif stage == 'test':
+        elif phase == 'test':
             return self.test_set
         
-        raise ValueError(f"Unsupported stage: {stage}")
+        raise ValueError(f"Unsupported phase: {phase}")

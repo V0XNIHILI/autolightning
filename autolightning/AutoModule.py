@@ -14,8 +14,8 @@ from torch_mate.utils import get_class_and_init, get_modules
 class AutoModule(L.LightningModule):
     log_separator = "/"
     log_metrics = {}
-    log_stages = {"train": "train", "val": "val", "test": "test", "predict": "predict"}
-    log_order = "stage-metric" # or "metric-stage"
+    log_phases = {"train": "train", "val": "val", "test": "test", "predict": "predict"}
+    log_order = "phase-metric" # or "metric-phase"
 
     def __init__(self, cfg: Dict):
         """Lightweight wrapper around PyTorch Lightning LightningModule that adds support for a configuration dictionary.
@@ -24,7 +24,7 @@ class AutoModule(L.LightningModule):
         
         - `self.get_model()`: the created model
         - `self.criteria`: the created criterion
-        - `self.shared_step(self, batch, batch_idx, stage)`: a generic step function that is shared across all steps (train, val, test, predict)
+        - `self.shared_step(self, batch, batch_idx, phase)`: a generic step function that is shared across all steps (train, val, test, predict)
 
         Based on these, the following methods are automatically implemented:
 
@@ -48,19 +48,19 @@ class AutoModule(L.LightningModule):
         self._model = self.compile_model(self.config_model())
         self.criteria = self.configure_criteria()
 
-    def log_key(self, stage: str, metric: str, metric_postfix: str = None):
+    def log_key(self, phase: str, metric: str, metric_postfix: str = None):
         metric_key = self.log_metrics[metric]
-        stage_key = self.log_stages[stage]
+        phase_key = self.log_phases[phase]
 
         if metric_postfix:
             metric_key += metric_postfix
 
-        if self.log_order == "stage-metric":
-            return f"{stage_key}{self.log_separator}{metric_key}"
-        elif self.log_order == "metric-stage":
-            return f"{metric_key}{self.log_separator}{stage_key}"
+        if self.log_order == "phase-metric":
+            return f"{phase_key}{self.log_separator}{metric_key}"
+        elif self.log_order == "metric-phase":
+            return f"{metric_key}{self.log_separator}{phase_key}"
         
-        raise ValueError(f"Invalid log order: {self.log_order}; must be either 'stage-metric' or 'metric-stage'")
+        raise ValueError(f"Invalid log order: {self.log_order}; must be either 'phase-metric' or 'metric-phase'")
 
     def configure_configuration(self, cfg: Dict):
         return cfg
@@ -132,7 +132,7 @@ class AutoModule(L.LightningModule):
     def forward(self, x):
         return self.get_model()(x)
     
-    def shared_step(self, batch, batch_idx, stage: str):
+    def shared_step(self, batch, batch_idx, phase: str):
         raise NotImplementedError
     
     def training_step(self, batch, batch_idx):

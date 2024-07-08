@@ -19,7 +19,7 @@ class AutoDataModule(L.LightningDataModule):
         """Lightweight wrapper around PyTorch Lightning LightningDataModule that adds support for configuration via a dictionary.
 
         Overall, compared to the PyTorch Lightning LightningModule, the following two attributes are added:
-        - `self.get_dataset(self, stage)`: a function that returns the dataset for a given stage
+        - `self.get_dataset(self, phase)`: a function that returns the dataset for a given phase
 
         Based on these, the following methods are automatically implemented:
         - `self.train_dataloader(self)`: calls `DataLoader(self.get_dataset('train'), **self.train_dataloader_kwargs)`
@@ -89,38 +89,38 @@ class AutoDataModule(L.LightningDataModule):
             stage
         )
 
-    def get_dataset(self, stage: str):
+    def get_dataset(self, phase: str):
         raise NotImplementedError
     
-    def get_transformed_dataset(self, stage: str):
-        dataset = self.get_dataset(stage)
+    def get_transformed_dataset(self, phase: str):
+        dataset = self.get_dataset(phase)
 
         # API for this entry in the configuration dict is up for change imo.
         if "pre_load" in self.hparams.dataset.get("extra", {}):
-            if stage in self.hparams.dataset["extra"]["pre_load"]:
+            if phase in self.hparams.dataset["extra"]["pre_load"]:
                 if self._has_pre_load_transform:
                     dataset = Transformed(dataset, self._pre_load_transform, self._pre_load_target_transform)
 
                 dataset = PreLoaded(dataset)
 
-        transform = self.get_transform(stage)
-        target_transform = self.get_target_transform(stage)
+        transform = self.get_transform(phase)
+        target_transform = self.get_target_transform(phase)
 
         if transform is None and target_transform is None:
             return dataset
         
         return Transformed(dataset, transform, target_transform)
     
-    def get_dataloader(self, stage: str):
-        dataset = self.get_transformed_dataset(stage)
-        kwargs = self.get_dataloader_kwargs(stage)
+    def get_dataloader(self, phase: str):
+        dataset = self.get_transformed_dataset(phase)
+        kwargs = self.get_dataloader_kwargs(phase)
 
         # Check if dataset is list or tuple and if the first element is a class
         if isinstance(dataset, (list, tuple)) and inspect.isclass(dataset[0]):
             return [DataLoader(ds, **kwargs) for ds in dataset]
         
         # Lightning only supports dict of dataloaders during training
-        if stage == 'train' and isinstance(dataset, dict):
+        if phase == 'train' and isinstance(dataset, dict):
             return {k: DataLoader(v, **kwargs) for k, v in dataset.items()}
 
         return DataLoader(dataset, **kwargs)
