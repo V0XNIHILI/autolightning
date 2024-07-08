@@ -10,6 +10,7 @@ from torch_mate.data.utils import Transformed, PreLoaded
 
 STAGES = ['train', 'val', 'test', 'predict']
 MOMENTS = ["pre", "post"]
+PRE_LOAD_MOMENT = "pre_load"
 
 
 class AutoDataModule(L.LightningDataModule):
@@ -39,6 +40,14 @@ class AutoDataModule(L.LightningDataModule):
         self._common_pre_transforms, self._common_post_transforms = [self.get_common_transform(m) for m in MOMENTS]
         self._common_pre_target_transforms, self._common_post_target_transforms = [self.get_common_target_transform(m) for m in MOMENTS]
         self._pre_transfer_batch_transform, self._post_transfer_batch_transform = [self.get_batch_transform(m) for m in MOMENTS]
+        
+        self._pre_load_transform = self.get_common_transform(PRE_LOAD_MOMENT)
+        self._pre_load_target_transform = self.get_common_target_transform(PRE_LOAD_MOMENT)
+
+        self._has_pre_load_transform = self._pre_load_transform is not None or self._pre_load_target_transform is not None
+
+        if "pre_load" not in self.hparams.dataset.get("extra", {}) and self._has_pre_load_transform:
+            raise ValueError("Either a regular or a target transform is provided for a pre-loaded dataset, but the dataset is not configured to be pre-loaded at any point")
 
     def configure_configuration(self, cfg: Dict):
         return cfg
@@ -89,6 +98,9 @@ class AutoDataModule(L.LightningDataModule):
         # API for this entry in the configuration dict is up for change imo.
         if "pre_load" in self.hparams.dataset.get("extra", {}):
             if phase in self.hparams.dataset["extra"]["pre_load"]:
+                if self._has_pre_load_transform:
+                    dataset = Transformed(dataset, self._pre_load_transform, self._pre_load_target_transform)
+
                 dataset = PreLoaded(dataset)
 
         transform = self.get_transform(phase)
