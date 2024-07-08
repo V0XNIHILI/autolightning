@@ -447,7 +447,7 @@ In case you want to add or override behavior of the defaults selected by autolig
     - Return the optimizers that should be used.
 - `configure_schedulers(self, optimizers: List[optim.Optimizer])`
     - Return the schedulers that should be used.
-- `shared_step(self, batch, batch_idx, phase: str)` 
+- `shared_step(self, batch, batch_idx, stage: str)` 
     - Function that is called by `training_step(...)`, `validation_step(...)`,  `test_step(...)` and `predict_step(...)` from the`AutoModule` with the fitting stage argument (`train`/`val`/`test`/`predict`)
 
 #### Example hook usage
@@ -466,14 +466,14 @@ class MyModel(AutoModule):
     def configure_criteria(self):
         return nn.MSELoss()
 
-    def shared_step(self, batch, batch_idx, phase: str):
+    def shared_step(self, batch, batch_idx, stage: str):
         X, y = batch
         model = self.get_model()
         criterion = self.criteria
 
         loss = criterion(model(X), y)
 
-        self.log(f"{phase}/loss", loss)
+        self.log(f"{stage}/loss", loss)
 
         return loss
 ```
@@ -492,9 +492,9 @@ Similar to models, you can customize the data loading behavior by using hooks. a
 - `get_target_transform(self, stage: str)`
 - `get_batch_transform(self, moment: str)`
 - `get_dataloader_kwargs(self, stage: str)`
-- `get_dataset(self, phase: str)`
-- `get_transformed_dataset(self, phase: str)`
-- `get_dataloader(self, phase: str)`
+- `get_dataset(self, stage: str)`
+- `get_transformed_dataset(self, stage: str)`
+- `get_dataloader(self, stage: str)`
 
 #### Example hook usage
 
