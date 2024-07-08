@@ -142,8 +142,8 @@ def shared_step(module: AutoModule, batch, batch_idx, phase: str):
     }
 
     if module.hparams.learner["cfg"]["log_confidence_interval"]:
-        log_dict[module.log_key(f"meta_{phase}", "accuracy@95%")] = confidence_interval
+        log_dict[module.log_key(f"meta_{phase}", "accuracy@95")] = confidence_interval
     
-    module.log_dict(log_dict)
+    module.log_dict(log_dict, prog_bar=phase == 'val')
     
     return loss

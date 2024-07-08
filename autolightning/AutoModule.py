@@ -12,11 +12,6 @@ from torch_mate.utils import get_class_and_init, get_modules
 
 
 class AutoModule(L.LightningModule):
-    log_separator = "/"
-    log_metrics = {}
-    log_phases = {"train": "train", "val": "val", "test": "test", "predict": "predict"}
-    log_order = "phase-metric" # or "metric-phase"
-
     def __init__(self, cfg: Dict):
         """Lightweight wrapper around PyTorch Lightning LightningModule that adds support for a configuration dictionary.
         Based on this configuration, it creates the model, criterion, optimizer, and scheduler. Overall, compared to the
@@ -42,6 +37,11 @@ class AutoModule(L.LightningModule):
         """
 
         super().__init__()
+
+        self.log_separator = "/"
+        self.log_metrics = {"loss": "loss", "accuracy": "accuracy"}
+        self.log_phases = {"train": "train", "val": "val", "test": "test", "predict": "predict"}
+        self.log_order = "phase-metric" # or "metric-phase"
 
         self.save_hyperparameters(self.configure_configuration(cfg))
 

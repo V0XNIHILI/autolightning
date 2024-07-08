@@ -9,6 +9,9 @@ class PrototypicalLearner(AutoModule):
     def __init__(self, cfg: Dict):
         super().__init__(cfg)
 
+        acc_at_95 = "accuracy@95"
+        self.log_metrics[acc_at_95] = acc_at_95
+
         few_shot_phases = ["meta_train", "meta_val", "meta_test"]
 
         for phase in few_shot_phases:
