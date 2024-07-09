@@ -48,36 +48,32 @@ def few_shot_nearest_neighbor(embedder: nn.Module,
         grouped_embeddings = torch.reshape(support_embeddings, (-1, k_shot, support_embeddings.size(1)))
         support_embeddings = torch.mean(grouped_embeddings, dim=1)
 
+        if metric == 'logistic-regression':
+            raise ValueError('Cannot use logistic regression with average support embeddings')
+
     if metric.startswith('euclidean'):
         similarities = -torch.cdist(query_embeddings, support_embeddings)
 
-        if metric.endswith('-squared'):
+        if metric == 'euclidean-squared':
             similarities = -similarities ** 2
-        elif metric != 'euclidean':
+        elif not metric.endswith('euclidean'):
             raise ValueError(f'Unknown metric: {metric}. {UNKNOWN_METRIC_MESSAGE}')
     elif metric == 'logistic-regression':
         # TODO: set random state
         clf = LogisticRegression(random_state=0).fit(support_embeddings.cpu().numpy(), train_labels.cpu().numpy())
         similarities = torch.tensor(clf.predict_proba(query_embeddings.cpu().numpy()), device=evaluation_labels.device)
+    elif metric == 'dot':
+        similarities = torch.matmul(query_embeddings, support_embeddings.t())
+    elif metric == 'manhattan':
+        similarities = -torch.cdist(query_embeddings, support_embeddings, p=1)
+    elif metric == 'cosine':
+        similarities = F.cosine_similarity(
+                        query_embeddings.unsqueeze(1),  # Shape: (total_queries, 1, embedding_dim)
+                        support_embeddings.unsqueeze(0),  # Shape: (1, support_size, embedding_dim)
+                        dim=2  # Compute cosine similarity along the embedding dimension
+                    )
     else:
-        # TODO: probably some of these can be parallelized
-        similarities = torch.empty(
-            (total_queries, support_embeddings.size(0)),
-            device=evaluation_labels.device)
-
-        for i in range(total_queries):
-            if metric == 'manhattan':
-                similarities[i] = -F.pairwise_distance(
-                    query_embeddings[i], support_embeddings, p=1)
-            elif metric == 'dot':
-                similarities[i] = torch.matmul(support_embeddings,
-                                                    query_embeddings[i])
-            elif metric == 'cosine':
-                # TODO: figure out if this is correct
-                similarities[i] = F.cosine_similarity(
-                    query_embeddings[i].view(1, -1), support_embeddings)
-            else:
-                raise ValueError(f'Unknown metric: {metric}. {UNKNOWN_METRIC_MESSAGE}')
+        raise ValueError(f'Unknown metric: {metric}. {UNKNOWN_METRIC_MESSAGE}')
 
     if average_support_embeddings or metric == 'logistic-regression':
         shots_per_class = 1
