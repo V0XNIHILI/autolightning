@@ -41,7 +41,6 @@ def few_shot_nearest_neighbor(embedder: nn.Module,
     query_embeddings = embeddings[train_data.size(0):]
 
     k_shot = len(train_labels) // len(torch.unique(train_labels))
-    total_queries = query_embeddings.size(0)
 
     if average_support_embeddings:
         # Average every k-shot embeddings to get a single embedding for each class
