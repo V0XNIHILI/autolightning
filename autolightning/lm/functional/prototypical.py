@@ -55,14 +55,19 @@ def few_shot_nearest_neighbor(embedder: nn.Module,
 
         if metric == 'euclidean-squared':
             similarities = -similarities ** 2
-        elif not metric.endswith('euclidean'):
+        elif metric != 'euclidean':
             raise ValueError(f'Unknown metric: {metric}. {UNKNOWN_METRIC_MESSAGE}')
     elif metric == 'logistic-regression':
         # TODO: set random state
         clf = LogisticRegression(random_state=0).fit(support_embeddings.cpu().numpy(), train_labels.cpu().numpy())
         similarities = torch.tensor(clf.predict_proba(query_embeddings.cpu().numpy()), device=evaluation_labels.device)
-    elif metric == 'dot':
+    elif metric.startswith('dot'):
         similarities = torch.matmul(query_embeddings, support_embeddings.t())
+
+        if metric == 'dot-sqrt':
+            similarities = torch.sqrt(similarities)
+        elif metric != 'dot':
+            raise ValueError(f'Unknown metric: {metric}. {UNKNOWN_METRIC_MESSAGE}')
     elif metric == 'manhattan':
         similarities = -torch.cdist(query_embeddings, support_embeddings, p=1)
     elif metric == 'cosine':
