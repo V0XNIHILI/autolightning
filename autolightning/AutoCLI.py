@@ -9,7 +9,6 @@ from functools import wraps
 
 from jsonargparse import ActionConfigFile
 
-import lightning as L
 from lightning.pytorch.cli import LightningCLI, LightningArgumentParser
 import lightning.pytorch as pl
 
@@ -36,18 +35,6 @@ def create_factory(cls, pre_applied_first_arg, return_annotation):
     return factory
 
 
-def pre_cli(module, cfg: Dict):
-    # Get the method resolution order (MRO) of the class
-    mro = inspect.getmro(module)
-
-    if L.LightningDataModule in mro:
-        return_annotation = L.LightningDataModule
-    else:
-        return_annotation = L.LightningModule
-
-    return create_factory(module, cfg, return_annotation)
-
-
 def write_to_temp_file(content):
     # Create a temporary file
     temp_file = tempfile.NamedTemporaryFile(delete=False, mode='w', encoding='utf-8', suffix='.yaml')
@@ -63,7 +50,7 @@ def write_to_temp_file(content):
         temp_file.close()
 
 
-def replace_tuples_with_lists(obj: Union[Dict, List, Tuple]):
+def replace_tuples_with_lists(obj: Union[Dict, List, Tuple, Any]):
     """Recursively replace all tuples in a nested dictionary or list with lists."""
     if isinstance(obj, dict):
         return {k: replace_tuples_with_lists(v) for k, v in obj.items()}
@@ -71,8 +58,8 @@ def replace_tuples_with_lists(obj: Union[Dict, List, Tuple]):
         return [replace_tuples_with_lists(elem) for elem in obj]
     elif isinstance(obj, tuple):
         return list(obj)
-    else:
-        return obj
+    
+    return obj
 
 
 class ActionConfigFilePython(ActionConfigFile):
