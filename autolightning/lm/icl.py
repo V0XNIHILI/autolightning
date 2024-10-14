@@ -8,7 +8,7 @@ from autolightning.lm.classifier import ClassifierMixin
 from autolightning.types import Phase
 
 
-def icl_forward(head_or_net: nn.Module, X_train, y_train, X_test, merge_data_strategy: str = "flatten", combine_batch_and_samples: bool = False, embedder: Optional[nn.Module] = None):
+def icl_forward(head_or_net: nn.Module, X_train, y_train, X_test, embedder: Optional[nn.Module] = None, merge_data_strategy: str = "flatten", combine_batch_and_samples: bool = False):
     if embedder is not None:
         batch = X_train.size(0)
 
@@ -24,11 +24,16 @@ def icl_forward(head_or_net: nn.Module, X_train, y_train, X_test, merge_data_str
             X_train = X_train.view(batch, -1, *X_train.size()[1:]) # (batch, n_train_samples, ...)
             X_test = X_test.view(batch, -1, *X_test.size()[1:]) # (batch, n_test_samples, ...)
 
-    X = torch.cat([X_train, y_train, X_test], dim=1) # (batch, 2 * n_train_samples + n_test_samples, n_features)
-
     if merge_data_strategy == "flatten":
-        X = X.view(X.size(0), -1)
+        X_train_test = torch.cat([X_train, X_test], dim=1).view(X_train.size(0), -1)
+
+        # Flatten y_train separately to make sure that different embedding
+        # size between y and X are handled correctly
+        y_train = y_train.view(y_train.size(0), -1)
+
+        X = torch.cat([X_train_test, y_train], dim=1)
     elif merge_data_strategy == "transpose":
+        X = torch.cat([X_train, y_train, X_test], dim=1) # (batch, 2 * n_train_samples + n_test_samples, n_features)
         X = X.transpose(1, 2)
     else:
         raise ValueError(f"Unknown strategy: {merge_data_strategy}")
@@ -55,7 +60,7 @@ class ICLMixin:
 
 class ICL(ICLMixin, Supervised):
     def forward(self, X_train, y_train, X_test):
-        return icl_forward(self.net, X_train, y_train, X_test, self.merge_data_strategy, self.combine_batch_and_samples, self.embedder)
+        return icl_forward(self.net, X_train, y_train, X_test, self.embedder, self.merge_data_strategy, self.combine_batch_and_samples)
     
     def shared_step(self, phase: Phase, batch, batch_idx):
         return icl_shared_step(self, batch)
