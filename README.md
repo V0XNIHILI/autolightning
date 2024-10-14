@@ -295,60 +295,6 @@ autolightning fit -c main.py  -c local.yaml
 ```
 
 #### Option 4: Use the original PyTorch Lightning CLI
-
-<details>
-    <summary>Option 4.1: Only enable trainer configuration + data/model kwargs from CLI</summary>
-
-This way, you only still have to provide the trainer configuration (via the `--config` flag) to the CLI, which often contains environment-specific settings like GPU indices, etc. while keeping experiment-specific settings fixed. To get more information on how this can be done, see [here](https://lightning.ai/docs/pytorch/stable/cli/lightning_cli_intermediate.html) for a crisp overview of the PyTorch Lightning CLI.
-
-```python
-# file: main.py
-
-from autolightning import pre_cli
-
-from autolightning.lm import SupervisedLearner
-from autolightning.datasets import MagicData
-
-from lightning.pytorch.cli import LightningCLI
-
-def cli_main():
-    cfg = ... # Load or set the configuration in any way you want
-
-    LightningCLI(
-        pre_cli(SupervisedLearner, cfg), # All arguments after cfg are available to be set in the CLI
-        pre_cli(MagicData, cfg), # Same goes for the data module
-        trainer_defaults=cfg["training"] if "training" in cfg else None,
-        seed_everything_default=cfg["seed"] if "seed" in cfg else True,
-    )
-
-if __name__ == "__main__":
-    cli_main()
-```
-
-An example configuration for the trainer in this case could be:
-
-```yaml
-# file: config.yaml
-
-trainer:
-  logger:
-    - class_path: WandbLogger
-      init_args:
-        project: test_autolightning
-  callbacks:
-    - class_path: ModelCheckpoint
-      init_args:
-        dirpath: ./nets
-        monitor: val/accuracy
-        save_top_k: 1
-  accelerator: gpu
-  check_val_every_n_epoch: 1
-  log_every_n_steps: 20
-data:
-  root: ./data
-```
-</details>
-
 <details>
     <summary>Option 4.2 (not recommended): Enable model, data and trainer configuration from CLI</summary>
 

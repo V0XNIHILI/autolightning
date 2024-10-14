@@ -9,9 +9,17 @@ venv
 # Testing & debugging
 
 wandb
+.neptune
 data
 lightning_logs
+
+.vscode
 
 # macOS
 
 .DS_Store
+
+# Testing dirs
+
+test_cfgs
+test_wandb_lightning

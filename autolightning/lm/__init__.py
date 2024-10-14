@@ -1,2 +1,5 @@
-from .supervised import SupervisedLearner
-from .few_shot import PrototypicalLearner
+from .supervised import Supervised
+from .classifier import Classifier
+from .prototypical import Prototypical
+
+__all__ = ["Classifier", "Supervised", "Prototypical"]

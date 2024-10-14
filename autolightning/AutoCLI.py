@@ -2,37 +2,18 @@ import sys
 import os
 import tempfile
 import yaml
+import importlib
 from typing import Dict, Any, Union, List, Tuple
-
-import inspect
-from functools import wraps
 
 from jsonargparse import ActionConfigFile
 
-from lightning.pytorch.cli import LightningCLI, LightningArgumentParser
-import lightning.pytorch as pl
+import lightning as L
+import pytorch_lightning as pl
+from lightning.pytorch.cli import LightningCLI, LightningArgumentParser, SaveConfigCallback
+from lightning.pytorch.loggers import Logger
+from lightning.pytorch.trainer import Trainer
 
 from torch_mate.utils import disable_torch_debug_apis, configure_cuda
-
-
-def create_factory(cls, pre_applied_first_arg, return_annotation):
-    # Get the signature of the __init__ method, excluding 'self'
-    init_signature = inspect.signature(cls.__init__)
-    parameters = list(init_signature.parameters.values())[2:]  # Exclude 'self' and 'cfg'
-    
-    # Create a new signature for the factory function
-    new_signature = inspect.Signature(parameters, return_annotation=return_annotation)
-    
-    # Create the factory function
-    @wraps(cls.__init__)
-    def factory(*args, **kwargs):
-        # Create an instance of the class with the pre-applied first argument
-        return cls(pre_applied_first_arg, *args, **kwargs)
-    
-    # Apply the new signature to the factory function
-    factory.__signature__ = new_signature
-    
-    return factory
 
 
 def write_to_temp_file(content):
@@ -62,10 +43,28 @@ def replace_tuples_with_lists(obj: Union[Dict, List, Tuple, Any]):
     return obj
 
 
-class ActionConfigFilePython(ActionConfigFile):
-    """ActionConfigFile with support for configurations stored in Python files with variable name `self.config_var_name` (default: 'cfg')."""
+class LoggerSaveConfigCallback(SaveConfigCallback):
+    def save_config(self, trainer: Trainer, pl_module: L.LightningModule, stage: str) -> None:
+        config = self.parser.dump(self.config, skip_none=True)  # Required for proper reproducibility
+        config = yaml.safe_load(config)
 
-    config_var_name = 'cfg'
+        # Log the full config to the logger
+        if isinstance(trainer.logger, Logger):
+            trainer.logger.log_hyperparams(config)
+
+        model_config = config.get("model", None)
+
+        # Only save the model config to the pl_module as hyperparameters
+        if model_config != None:
+            if "class_path" in model_config:
+                model_config = model_config.get("init_args", None)
+
+            if model_config != None:
+                pl_module.save_hyperparameters(model_config, logger=False)
+
+
+class ActionConfigFilePython(ActionConfigFile):
+    """ActionConfigFile with support for configurations stored in Python files with variable name `config`."""
 
     def __call__(self, parser, cfg, values, option_string=None):
         SEP = ".py"
@@ -81,44 +80,24 @@ class ActionConfigFilePython(ActionConfigFile):
             sys.path.append(module_dir)
 
             # Import the module
-            module = __import__(module_name)
+            module = importlib.import_module(module_name)
 
-            # Access the variable
-            variable = getattr(module, self.config_var_name)
+            if hasattr(module, "CONFIG_NAME"):
+                config_name = getattr(module, "CONFIG_NAME")
+            else:
+                config_name = "config"
+
+            variable = getattr(module, config_name)
             dict_variable = dict(variable)
-
-            yaml_contents = {}
-
-            if "training" in dict_variable:
-                yaml_contents["trainer"] = dict_variable["training"]
-
-            if "learner" in dict_variable:
-                yaml_contents["model"] = {
-                    "class_path": dict_variable["learner"]["name"],
-                    "init_args": {
-                        "cfg": dict_variable
-                    }
-                }
-
-            if "dataset" in dict_variable:
-                yaml_contents["data"] = {
-                    "class_path": dict_variable["dataset"]["name"],
-                    "init_args": {
-                        "cfg": dict_variable
-                    }
-                }
-
-            if "seed" in dict_variable:
-                yaml_contents["seed_everything"] = dict_variable["seed"]
 
             # Loop through all nested keys and replace all tuples with lists
             # as jsonargparse's implementation of YAML loading does not support tuples
             # (see line _loaders_dumpers.py#L19 in jsonargparse project where they
             # use a SafeLoader instead of a FullLoader which supports tuples)
-            yaml_contents = replace_tuples_with_lists(yaml_contents)
+            dict_variable = replace_tuples_with_lists(dict_variable)
 
             # Write the contents to a temporary file
-            temp_file_path = write_to_temp_file(yaml.dump(yaml_contents))
+            temp_file_path = write_to_temp_file(yaml.dump(dict_variable))
 
             values = temp_file_path
 
@@ -126,20 +105,16 @@ class ActionConfigFilePython(ActionConfigFile):
 
 
 class AutoCLI(LightningCLI):
-    def __init__(
-        self,
-        *args,
-        **kwargs
-    ):
-        super().__init__(*args, **kwargs)
-
     def init_parser(self, **kwargs: Any) -> LightningArgumentParser:
         """Method that instantiates the argument parser."""
+
+        # This is a 1:1 copy of the LightningCLI.init_parser method, but now with the ActionConfigFilePython class
+        # instead of the ActionConfigFile class. We add this argument here instead of in the add_arguments_to_parser
+        # since otherwise we get "ValueError: A parser is only allowed to have a single ActionConfigFile argument."
         kwargs.setdefault("dump_header", [f"lightning.pytorch=={pl.__version__}"])
+
         parser = LightningArgumentParser(**kwargs)
-        parser.add_argument(
-            "-c", "--config", action=ActionConfigFilePython, help="Path to a configuration file in json or yaml format."
-        )
+        parser.add_argument("-c", "--config", action=ActionConfigFilePython, help="Path to a configuration file in JSON, YAML or Python format.")
 
         return parser
     
