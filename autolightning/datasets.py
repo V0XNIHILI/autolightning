@@ -12,5 +12,6 @@ class MNIST(AutoDataModule):
                              test=dict(train=False)),
             },
             random_split=dict(source="defaults", dest=dict(train=1-val_percentage, val=val_percentage)),
+            requires_prepare=download,
             **kwargs
         )
