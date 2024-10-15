@@ -1,21 +1,123 @@
-from typing import Dict
+from typing import Dict, Optional, Union, List, Callable
 import inspect
 
 import lightning as L
 
-from torch.utils.data import DataLoader
+import torch
+from torch.utils.data import DataLoader, Dataset, random_split as torch_random_split
+from torchvision.transforms import Compose
 
-from autolightning.utils import build_dataloader_kwargs, create_stage_transforms, build_transform
+from jsonargparse import Namespace
+
+from pytorch_lightning.cli import instantiate_class
+
+
+from autolightning.types import Phase
 from torch_mate.data.utils import Transformed, PreLoaded
 
-STAGES = ['train', 'val', 'test', 'predict']
-MOMENTS = ["pre", "post"]
+STAGES = ["train", "val", "test", "predict"]
+ALLOWED_DATASET_KEYS = STAGES + ["defaults"]
 PRE_LOAD_MOMENT = "pre_load"
+
+TransformValue = Union[List[Callable], Callable]
+
+
+def instantiate_datasets(dataset: Optional[Union[Dict[str, Dataset], Dict, Dataset]]) -> (Dataset | Dict[str, Dataset] | None):
+    if dataset is None or isinstance(dataset, Dataset):
+        return dataset
+
+    if not isinstance(dataset, dict):
+        raise ValueError(f"Unsupported dataset configuration: {dataset}; can either be None, a Dataset instance or a dictionary")
+    
+    # If the dictionary has any of the stages, then it is a dictionary of datasets per stage
+    if any(key in dataset for key in STAGES):
+        # Make sure no other keys are present except for the stages
+        assert set(dataset.keys()) - set(STAGES) == set(), f"Unsupported keys in dataset configuration: {set(dataset.keys()) - set(STAGES)}"
+        # Make sure all values are datasets
+        assert all(isinstance(ds, Dataset) for ds in dataset.values()), f"Unsupported values in dataset configuration that are not an instance of a Dataset: {set(type(ds) for ds in dataset.values())}"
+
+        return dataset
+    
+    if "class" in dataset:
+        init = {"class_path": dataset["class"]}
+
+        # There is this weird bug, where dataset["class"] can be a Namespace object with empty args
+        # if this dictionary is set via a YAML file
+        if isinstance(init["class_path"], Namespace):
+            init["class_path"] = dict(init["class_path"])["class_path"]
+
+        if "args" in dataset and any(key in ALLOWED_DATASET_KEYS for key in dataset["args"].keys()) and all(isinstance(phase_val, dict) for phase_val in dataset["args"].values()):
+            # If any of the keys "train", "val", "test" or "predict" are present and they are all dictionaries, we build the datasets separately
+
+            # Make sure no other keys are present except for the stages
+            assert set(dataset["args"].keys()) - set(ALLOWED_DATASET_KEYS) == set(), f"Unsupported keys in dataset configuration: {set(dataset['args'].keys()) - set(ALLOWED_DATASET_KEYS)}"
+
+            defaults = dataset["args"].get("defaults", {})
+
+            # only stage keys, then number of stages
+            # stage keys and defaults, then number of stages + 1, except for when all stages are present
+            keys_to_init = []
+
+            if "defaults" in dataset["args"]:
+                if len(dataset["args"]) == len(STAGES) + 1:
+                    keys_to_init = STAGES
+                else:
+                    keys_to_init = dataset["args"]
+            else:
+                keys_to_init = dataset["args"]
+
+            dataset_dict = {}
+            
+            for key in keys_to_init:
+                init["init_args"] = dict(defaults) | (dataset["args"].get(key, {}))
+
+                if type(init["class_path"]) is str:
+                    dataset_dict[key] = instantiate_class(tuple(), init)
+                else:
+                    dataset_dict[key] = init["class_path"](**init["init_args"])
+
+            return dataset_dict
+        
+        return instantiate_class(tuple(), init | {"init_args": dataset.get("args", {})})
+    
+    raise ValueError(f"Unsupported dataset configuration: {dataset}")
+
+
+def compose_if_list(tf: TransformValue) -> Callable:
+    if type(tf) is list:
+        if len(tf) == 0:
+            return None
+        
+        if len(tf) == 1:
+            return tf[0]
+        
+        return Compose(tf)
+    
+    return tf
+
+
+def build_transform(stage: str, transforms: Dict[str, TransformValue]) -> (Callable | None):
+    tfs = []
+
+    for key in ["pre", stage, "post"]:
+        if key in transforms:
+            tf = compose_if_list(transforms[key])
+            tfs.append(tf)
+
+    return compose_if_list(tfs)
 
 
 class AutoDataModule(L.LightningDataModule):
 
-    def __init__(self, cfg: Dict):
+    def __init__(self,
+                 dataset: Optional[Union[Dict[str, Dataset], Dict, Dataset]] = None,
+                 dataloaders: Optional[Dict] = None,
+                 transforms: Optional[Dict[str, TransformValue]] = None,
+                 target_transforms: Optional[Dict[str, TransformValue]] = None,
+                 batch_transforms: Optional[Dict[str, TransformValue]] = None,
+                 requires_prepare: bool = True,
+                 pre_load: Union[Dict[str, bool], bool] = False,
+                 random_split: Optional[Dict[str, Union[Union[int, float], Union[str, Dict[str, Union[int, float]]]]]] = None):
         """Lightweight wrapper around PyTorch Lightning LightningDataModule that adds support for configuration via a dictionary.
 
         Overall, compared to the PyTorch Lightning LightningModule, the following two attributes are added:
@@ -35,73 +137,102 @@ class AutoDataModule(L.LightningDataModule):
 
         super().__init__()
 
-        self.save_hyperparameters(self.configure_configuration(cfg))
+        self.dataset = dataset
+        self.dataloaders = {} if dataloaders is None else dataloaders
+        self.transforms = {} if transforms is None else transforms
+        self.target_transforms = {} if target_transforms is None else target_transforms
+        self.batch_transforms = {} if batch_transforms is None else batch_transforms
 
-        self._common_pre_transforms, self._common_post_transforms = [self.get_common_transform(m) for m in MOMENTS]
-        self._common_pre_target_transforms, self._common_post_target_transforms = [self.get_common_target_transform(m) for m in MOMENTS]
-        self._pre_transfer_batch_transform, self._post_transfer_batch_transform = [self.get_batch_transform(m) for m in MOMENTS]
+        self.requires_prepare = requires_prepare
+        self.pre_load = pre_load
+
+        self.random_split = random_split
+
+        self.instantiated_dataset: Union[Dataset, Dict[str, Dataset]] = {}
         
-        self._pre_load_transform = self.get_common_transform(PRE_LOAD_MOMENT)
-        self._pre_load_target_transform = self.get_common_target_transform(PRE_LOAD_MOMENT)
-
-        self._has_pre_load_transform = self._pre_load_transform is not None or self._pre_load_target_transform is not None
-
-        if "pre_load" not in self.hparams.dataset.get("extra", {}) and self._has_pre_load_transform:
-            raise ValueError("Either a regular or a target transform is provided for a pre-loaded dataset, but the dataset is not configured to be pre-loaded at any point")
-
-    def configure_configuration(self, cfg: Dict):
-        return cfg
-
-    def get_common_transform(self, moment: str):
-        return build_transform(self.hparams.dataset.get("transforms", {}).get(moment, []))
-    
-    def get_common_target_transform(self, moment: str):
-        return build_transform(self.hparams.dataset.get("target_transforms", {}).get(moment, []))
-    
-    def get_batch_transform(self, moment: str):
-        return build_transform(self.hparams.dataset.get("batch_transforms", {}).get(moment, []))
+    def prepare_data(self) -> None:
+        if self.requires_prepare:
+            instantiate_datasets(self.dataset)
 
     def get_transform(self, stage: str):
-        if "transforms" in self.hparams.dataset:
-            return create_stage_transforms(
-                self.hparams.dataset["transforms"].get(stage, None),
-                self._common_pre_transforms if stage in STAGES else None,
-                self._common_post_transforms if stage in STAGES else None
-            )
-        
-        return None
-    
-    def get_target_transform(self, stage: str):
-        if "target_transforms" in self.hparams.dataset:
-            return create_stage_transforms(
-                self.hparams.dataset["target_transforms"].get(stage, None),
-                self._common_pre_target_transforms if stage in STAGES else None,
-                self._common_post_target_transforms if stage in STAGES else None
-            )
-        
-        return None
-    
-    def get_dataloader_kwargs(self, stage: str):
-        dataloaders_cfg = self.hparams.get("dataloaders", {})
-        
-        return build_dataloader_kwargs(
-            dataloaders_cfg,
-            stage
-        )
+        return build_transform(stage, self.transforms)
 
-    def get_dataset(self, phase: str):
-        raise NotImplementedError
+    def get_target_transform(self, stage: str):
+        return build_transform(stage, self.target_transforms)
     
-    def get_transformed_dataset(self, phase: str):
+    def setup(self, stage: str):
+        datasets = instantiate_datasets(self.dataset)
+
+        if datasets == None:
+            return
+        
+        relevant_keys = []
+
+        if stage == 'fit':
+            relevant_keys = ['train', 'val']
+        elif stage == 'test':
+            relevant_keys = ['test']
+        elif stage == 'predict':
+            relevant_keys = ['predict']
+        elif stage == 'validate':
+            relevant_keys = ['val']
+
+        generator = torch.Generator().manual_seed(42)
+
+        if isinstance(datasets, Dataset):
+            if isinstance(self.random_split, dict):
+                assert set(self.random_split.keys()) - set(STAGES) == set(), f"Unsupported keys in random split configuration: {set(self.random_split.keys()) - set(STAGES)}"
+
+                dataset_splits = torch_random_split(datasets, self.random_split.values(), generator=generator)
+                datasets = dict(zip(self.random_split.keys(), dataset_splits))
+
+                for phase_key in relevant_keys:
+                    self.instantiated_dataset[phase_key] = datasets[phase_key]
+
+                # TODO! ADD WARNING HERE!
+            else:
+                for phase_key in relevant_keys:
+                    self.instantiated_dataset[phase_key] = datasets
+        else:
+            instantiate_dataset_keys = []
+
+            for phase_key in relevant_keys:
+                if phase_key in instantiate_dataset_keys:
+                    continue
+
+                new_phase_key = "defaults" if phase_key not in datasets else phase_key
+
+                if new_phase_key == "defaults" and new_phase_key not in datasets:
+                    raise ValueError(f"Phase key {phase_key} not found in dataset configuration; also no defaults found")
+
+                dataset = datasets[new_phase_key]
+                    
+                if isinstance(self.random_split, dict) and self.random_split["source"] == new_phase_key:
+                    dataset_splits = torch_random_split(dataset, self.random_split["dest"].values(), generator=generator)
+                    
+                    new_datasets = dict(zip(self.random_split["dest"].keys(), dataset_splits))
+
+                    for split_key, split_dataset in new_datasets.items():
+                        self.instantiated_dataset[split_key] = split_dataset
+
+                    instantiate_dataset_keys.extend(new_datasets.keys())
+                else:
+                    instantiate_dataset_keys.append(phase_key)
+
+    def get_dataset(self, phase: Phase):
+        return self.instantiated_dataset[phase]
+    
+    def get_transformed_dataset(self, phase: Phase):
         dataset = self.get_dataset(phase)
 
-        # API for this entry in the configuration dict is up for change imo.
-        if "pre_load" in self.hparams.dataset.get("extra", {}):
-            if phase in self.hparams.dataset["extra"]["pre_load"]:
-                if self._has_pre_load_transform:
-                    dataset = Transformed(dataset, self._pre_load_transform, self._pre_load_target_transform)
+        if self.pre_load == True or (isinstance(self.pre_load, dict) and self.pre_load.get(phase, False)):
+            pre_load_tf = self.transforms.get(PRE_LOAD_MOMENT, None)
+            pre_load_target_tf = self.target_transforms.get(PRE_LOAD_MOMENT, None)
 
-                dataset = PreLoaded(dataset)
+            if pre_load_tf is not None or pre_load_target_tf is not None:
+                dataset = Transformed(dataset, pre_load_tf, pre_load_target_tf)
+
+            dataset = PreLoaded(dataset)
 
         transform = self.get_transform(phase)
         target_transform = self.get_target_transform(phase)
@@ -111,17 +242,14 @@ class AutoDataModule(L.LightningDataModule):
         
         return Transformed(dataset, transform, target_transform)
     
-    def get_dataloader(self, phase: str):
+    def get_dataloader(self, phase: Phase):
         dataset = self.get_transformed_dataset(phase)
-        kwargs = self.get_dataloader_kwargs(phase)
 
-        # Check if dataset is list or tuple and if the first element is a class
-        if isinstance(dataset, (list, tuple)) and inspect.isclass(dataset[0]):
-            return [DataLoader(ds, **kwargs) for ds in dataset]
-        
-        # Lightning only supports dict of dataloaders during training
-        if phase == 'train' and isinstance(dataset, dict):
-            return {k: DataLoader(v, **kwargs) for k, v in dataset.items()}
+        # If the dataloader configuration is specified per phase...
+        if any(key in self.dataloaders for key in ALLOWED_DATASET_KEYS):
+            kwargs = dict(self.dataloaders.get("defaults", {})) | self.dataloaders.get(phase, {})
+        else:
+            kwargs = self.dataloaders
 
         return DataLoader(dataset, **kwargs)
 
@@ -138,13 +266,17 @@ class AutoDataModule(L.LightningDataModule):
         return self.get_dataloader('predict')
     
     def on_before_batch_transfer(self, batch, dataloader_idx: int):
-        if self._pre_transfer_batch_transform is not None:
-            return self._pre_transfer_batch_transform(batch)
+        tf = self.batch_transforms.get("pre", None)
+
+        if tf is not None:
+            return tf(batch)
         
         return batch
     
     def on_after_batch_transfer(self, batch, dataloader_idx: int):
-        if self._post_transfer_batch_transform is not None:
-            return self._post_transfer_batch_transform(batch)
+        tf = self.batch_transforms.get("post", None)
+
+        if tf is not None:
+            return tf(batch)
         
         return batch
