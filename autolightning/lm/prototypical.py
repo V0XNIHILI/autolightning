@@ -16,6 +16,7 @@ from autolightning.lm import Classifier
 MetaSample = Tuple[Tuple[torch.Tensor, torch.Tensor],
                                             Tuple[torch.Tensor, torch.Tensor]]
 MetaBatch = List[MetaSample]
+MetricType = Literal["euclidean", "euclidean-squared", "logistic-regression", "dot", "dot-sqrt", "manhattan", "cosine"]
 
 
 UNKNOWN_METRIC_MESSAGE = 'Must be one of [euclidean, euclidean-squared, manhattan, dot, cosine, logistic-regression]'
@@ -110,9 +111,6 @@ def prototypical_shared_step(module, batch):
         all_evaluation_labels.append(y_test[task_idx])
 
     return torch.cat(all_similarities), torch.cat(all_evaluation_labels)
-
-
-MetricType = Literal["euclidean", "euclidean-squared", "logistic-regression", "dot", "dot-sqrt", "manhattan", "cosine"]
 
 
 class PrototypicalMixin:
