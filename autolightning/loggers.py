@@ -3,7 +3,7 @@ from typing import Dict, Mapping, Optional, Union, Literal
 from lightning.pytorch.loggers import CometLogger, CSVLogger, Logger, MLFlowLogger, NeptuneLogger, TensorBoardLogger, WandbLogger
 from lightning.pytorch.utilities.rank_zero import rank_zero_only
 
-from autolightning.types import Phase
+from .types import Phase
 
 
 LOG_PHASE_KEYS = {"train", "val", "test", "predict"}

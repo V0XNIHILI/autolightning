@@ -1,4 +1,4 @@
-from autolightning import AutoDataModule
+from . import AutoDataModule
 
 
 class MNIST(AutoDataModule):

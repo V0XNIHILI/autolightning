@@ -1,5 +1,5 @@
-from autolightning import AutoModule, AutoDataModule, AutoCLI
-from autolightning.AutoCLI import LoggerSaveConfigCallback
+from . import AutoModule, AutoDataModule, AutoCLI
+from .auto_cli import LoggerSaveConfigCallback
 
 
 def main():

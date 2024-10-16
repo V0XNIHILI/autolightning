@@ -10,8 +10,8 @@ from jsonargparse import Namespace
 
 from pytorch_lightning.cli import instantiate_class
 
+from .types import Phase
 
-from autolightning.types import Phase
 from torch_mate.data.utils import Transformed, PreLoaded
 
 STAGES = ["train", "val", "test", "predict"]
