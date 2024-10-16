@@ -60,7 +60,7 @@ def prototypical_forward(embedder: nn.Module,
     elif metric == 'logistic-regression':
         # TODO: set random state
         clf = LogisticRegression(random_state=0).fit(support_embeddings.cpu().numpy(), train_labels.cpu().numpy())
-        similarities = torch.tensor(clf.predict_proba(query_embeddings.cpu().numpy()), device=evaluation_labels.device)
+        similarities = torch.tensor(clf.predict_proba(query_embeddings.cpu().numpy()), device=query_embeddings.device)
     elif metric.startswith('dot'):
         similarities = torch.matmul(query_embeddings, support_embeddings.t())
 
