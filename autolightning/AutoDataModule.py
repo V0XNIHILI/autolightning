@@ -1,5 +1,4 @@
 from typing import Dict, Optional, Union, List, Callable
-import inspect
 
 import lightning as L
 
@@ -217,6 +216,7 @@ class AutoDataModule(L.LightningDataModule):
 
                     instantiate_dataset_keys.extend(new_datasets.keys())
                 else:
+                    self.instantiated_dataset[phase_key] = dataset
                     instantiate_dataset_keys.append(phase_key)
 
     def get_dataset(self, phase: Phase):
