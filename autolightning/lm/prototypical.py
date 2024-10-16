@@ -10,8 +10,7 @@ from sklearn.linear_model import LogisticRegression
 
 from torch_mate.typing import OptionalBatchTransform
 
-from autolightning import AutoModule
-from autolightning.lm.classifier import ClassifierMixin
+from autolightning.lm import Classifier
 
 
 MetaSample = Tuple[Tuple[torch.Tensor, torch.Tensor],
@@ -96,9 +95,8 @@ def prototypical_forward(embedder: nn.Module,
     return similarities
 
 
-
-def prototypical_shared_step(phase, module, criterion, batch, batch_idx):
-    ((X_train, X_test), (y_train, y_test)) = batch
+def prototypical_shared_step(module, batch):
+    ((X_train, y_train), (X_test, y_test)) = batch
 
     all_similarities = []
     all_evaluation_labels = []
@@ -111,8 +109,7 @@ def prototypical_shared_step(phase, module, criterion, batch, batch_idx):
         all_similarities.append(similarities)
         all_evaluation_labels.append(y_test[task_idx])
 
-    return meta_error / meta_batch_size, (torch.cat(all_similarities),
-                                            torch.cat(all_evaluation_labels))
+    return torch.cat(all_similarities), torch.cat(all_evaluation_labels)
 
 
 MetricType = Literal["euclidean", "euclidean-squared", "logistic-regression", "dot", "dot-sqrt", "manhattan", "cosine"]
@@ -126,9 +123,9 @@ class PrototypicalMixin:
         self.average_support_embeddings = average_support_embeddings
 
 
-class Prototypical(ClassifierMixin, PrototypicalMixin, AutoModule):
+class Prototypical(PrototypicalMixin, Classifier):
     def forward(self, train_data, test_data, train_labels):
         return prototypical_forward(self.net, train_data, test_data, train_labels, self.metric, self.average_support_embeddings)
     
     def shared_step(self, phase: str, batch, batch_idx):
-        return prototypical_shared_step(phase, self, self.criterion, batch, batch_idx)
+        return prototypical_shared_step(self, batch)
