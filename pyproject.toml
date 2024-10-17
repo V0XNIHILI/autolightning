@@ -17,7 +17,7 @@ dependencies = [
   'torch',
   'torchvision',
   'lightning',
-  'git+https://github.com/V0XNIHILI/torch-mate.git@main'
+  'torch-mate@git+https://github.com/V0XNIHILI/torch-mate'
 ]
 
 [project.scripts]
