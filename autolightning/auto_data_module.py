@@ -82,7 +82,7 @@ def instantiate_datasets(dataset: Optional[Union[Dict[str, Dataset], Dict, Datas
     raise ValueError(f"Unsupported dataset configuration: {dataset}")
 
 
-def compose_if_list(tf: TransformValue) -> Callable:
+def compose_if_list(tf: Optional[TransformValue]) -> Optional[Callable]:
     if type(tf) is list:
         if len(tf) == 0:
             return None
@@ -226,8 +226,8 @@ class AutoDataModule(L.LightningDataModule):
         dataset = self.get_dataset(phase)
 
         if self.pre_load == True or (isinstance(self.pre_load, dict) and self.pre_load.get(phase, False)):
-            pre_load_tf = self.transforms.get(PRE_LOAD_MOMENT, None)
-            pre_load_target_tf = self.target_transforms.get(PRE_LOAD_MOMENT, None)
+            pre_load_tf = compose_if_list(self.transforms.get(PRE_LOAD_MOMENT, None))
+            pre_load_target_tf = compose_if_list(self.target_transforms.get(PRE_LOAD_MOMENT, None))
 
             if pre_load_tf is not None or pre_load_target_tf is not None:
                 dataset = Transformed(dataset, pre_load_tf, pre_load_target_tf)
