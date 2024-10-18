@@ -19,6 +19,7 @@ ALLOWED_DATASET_KEYS = STAGES + ["defaults"]
 PRE_LOAD_MOMENT = "pre_load"
 
 TransformValue = Union[List[Callable], Callable]
+TransformType = Union[Dict[str, TransformValue], TransformValue]
 
 
 def instantiate_datasets(dataset: Optional[Union[Dict[str, Dataset], Dict, Dataset]]) -> (Dataset | Dict[str, Dataset] | None):
@@ -95,7 +96,10 @@ def compose_if_list(tf: Optional[TransformValue]) -> Optional[Callable]:
     return tf
 
 
-def build_transform(stage: str, transforms: Dict[str, TransformValue]) -> (Callable | None):
+def build_transform(stage: str, transforms: TransformType) -> (Callable | None):
+    if type(transforms) is not dict:
+        return compose_if_list(transforms)
+
     tfs = []
 
     for key in ["pre", stage, "post"]:
@@ -111,9 +115,9 @@ class AutoDataModule(L.LightningDataModule):
     def __init__(self,
                  dataset: Optional[Union[Dict[str, Dataset], Dict, Dataset]] = None,
                  dataloaders: Optional[Dict] = None,
-                 transforms: Optional[Dict[str, TransformValue]] = None,
-                 target_transforms: Optional[Dict[str, TransformValue]] = None,
-                 batch_transforms: Optional[Dict[str, TransformValue]] = None,
+                 transforms: Optional[TransformType] = None,
+                 target_transforms: Optional[TransformType] = None,
+                 batch_transforms: Optional[TransformType] = None,
                  requires_prepare: bool = True,
                  pre_load: Union[Dict[str, bool], bool] = False,
                  random_split: Optional[Dict[str, Union[Union[int, float], Union[str, Dict[str, Union[int, float]]]]]] = None):
@@ -226,17 +230,19 @@ class AutoDataModule(L.LightningDataModule):
         dataset = self.get_dataset(phase)
 
         if self.pre_load == True or (isinstance(self.pre_load, dict) and self.pre_load.get(phase, False)):
-            pre_load_tf = compose_if_list(self.transforms.get(PRE_LOAD_MOMENT, None))
-            pre_load_target_tf = compose_if_list(self.target_transforms.get(PRE_LOAD_MOMENT, None))
+            if isinstance(self.transforms, dict):
+                pre_load_tf = compose_if_list(self.transforms.get(PRE_LOAD_MOMENT, None))
+                pre_load_target_tf = compose_if_list(self.target_transforms.get(PRE_LOAD_MOMENT, None))
 
-            if pre_load_tf is not None or pre_load_target_tf is not None:
-                dataset = Transformed(dataset, pre_load_tf, pre_load_target_tf)
+                if pre_load_tf is not None or pre_load_target_tf is not None:
+                    dataset = Transformed(dataset, pre_load_tf, pre_load_target_tf)
 
-            dataset = PreLoaded(dataset)
-        elif self.transforms.get(PRE_LOAD_MOMENT, None) != None:
-            raise ValueError(f"Pre-load transform specified for phase {phase} but pre-load is not enabled")
-        elif self.target_transforms.get(PRE_LOAD_MOMENT, None) != None:
-            raise ValueError(f"Pre-load target transform specified for phase {phase} but pre-load is not enabled")
+                dataset = PreLoaded(dataset)
+        elif isinstance(self.transforms, dict):
+            if self.transforms.get(PRE_LOAD_MOMENT, None) != None:
+                raise ValueError(f"Pre-load transform specified for phase {phase} but pre-load is not enabled")
+            elif self.target_transforms.get(PRE_LOAD_MOMENT, None) != None:
+                raise ValueError(f"Pre-load target transform specified for phase {phase} but pre-load is not enabled")
 
         transform = self.get_transform(phase)
         target_transform = self.get_target_transform(phase)
@@ -251,6 +257,8 @@ class AutoDataModule(L.LightningDataModule):
 
         # If the dataloader configuration is specified per phase...
         if any(key in self.dataloaders for key in ALLOWED_DATASET_KEYS):
+            assert set(self.dataloaders.keys()) - set(ALLOWED_DATASET_KEYS) == set(), f"Unsupported keys in dataloader configuration: {set(self.dataloaders.keys()) - set(ALLOWED_DATASET_KEYS)}; only {ALLOWED_DATASET_KEYS} are allowed"
+
             kwargs = dict(self.dataloaders.get("defaults", {})) | self.dataloaders.get(phase, {})
         else:
             kwargs = self.dataloaders
