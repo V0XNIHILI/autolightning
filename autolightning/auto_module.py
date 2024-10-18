@@ -1,52 +1,29 @@
-from typing import Dict, List, Optional, Union, Tuple, Callable, Any, Iterator, Literal
-
+from typing import Dict, List, Optional, Union, Tuple, Callable, Any, Iterator, Literal, Iterable
 import warnings
 
 import torch.nn as nn
 import torch.optim as optim
+from torch.nn.parameter import Parameter
+from torch.optim.optimizer import Optimizer
 
 import lightning as L
 from pytorch_lightning.utilities.types import OptimizerLRScheduler
 
 from torchmetrics.metric import Metric
-
-from torch.nn.parameter import Parameter
-
-from typing import TypedDict
+from lightning.pytorch.cli import OptimizerCallable, LRSchedulerCallable
 
 
-class ClassConfigDict(TypedDict):
-    name: Union[str, Callable]
-    cfg: Dict
-
-
-AllClassConfigDictVariants = Union[ClassConfigDict, Dict[str, ClassConfigDict], List[ClassConfigDict]]
-CriterionNetType = Union[AllClassConfigDictVariants, nn.Module, nn.ModuleDict, nn.ModuleList]
 Phase = Literal["train", "val", "test"]
 
 MetricType = Dict[str, Union[Metric, Callable[..., Any]]]
-
-
-from torch.optim.optimizer import Optimizer
-
-from lightning.pytorch.cli import OptimizerCallable, LRSchedulerCallable
-
 OptimizerType = Union[Optimizer, OptimizerCallable, List[Union[Optimizer, OptimizerCallable]], Tuple[Union[Optimizer, OptimizerCallable]], Dict[str, OptimizerCallable]]
-
-
 LrSchedulerType = Union[LRSchedulerCallable, ]
-
-ModuleType = ...
+IterableOfModules = Iterable[nn.Module]
 
 
 LOG_PHASE_KEYS = {"train", "val", "test", "predict"}
 LOG_ORDER_OPTIONS = {"phase_first", "metric_first"}
 KEYS_TO_IGNORE = ["net", "criterion", "metrics", "optimizer", "compiler", "metrics", "loss_log_key", "log_metrics"]
-
-
-from typing import Iterable
-
-IterableOfModules = Iterable[nn.Module]
 
 
 class AutoModule(L.LightningModule):
