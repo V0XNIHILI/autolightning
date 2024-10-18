@@ -1,10 +1,8 @@
-from typing import List, Dict, Any, Optional
+from typing import Any, Optional
 from collections import OrderedDict
 
 import torch
 import torch.nn as nn
-
-from importlib import import_module
 
 
 LIGHTNING_STATE_DICT_KEYS = [
