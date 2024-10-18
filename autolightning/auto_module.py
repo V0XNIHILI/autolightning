@@ -272,7 +272,7 @@ class AutoModule(L.LightningModule):
 
         prog_bar = self.enable_prog_bar(phase)
 
-        if self.loss_log_key != None:
+        if self.loss_log_key != None and loss != None:
             self.log(f"{phase}/{self.loss_log_key}", loss, prog_bar=prog_bar)
 
         if isinstance(metric_inputs, dict):
