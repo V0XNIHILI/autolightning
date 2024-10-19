@@ -116,13 +116,13 @@ class AutoModule(L.LightningModule):
                     if isinstance(scheduler, optim.lr_scheduler._LRScheduler):
                         schedulers.append(scheduler)
                     else:
-                        schedulers.append(scheduler(optimizer))
+                        schedulers.append(scheduler(optimizers[-1]))
             elif callable(optimizer):
                 params = self.parameters_for_optimizer() if module == self else module.parameters()
                 optimizers.append(optimizer(params))
 
                 if scheduler != None:
-                    schedulers.append(scheduler(optimizer))
+                    schedulers.append(scheduler(optimizers[-1]))
             elif isinstance(optimizer, (list, tuple)):
                 if all(isinstance(opt, optim.Optimizer) for opt in optimizer):
                     optimizers.extend(optimizer)
@@ -135,7 +135,7 @@ class AutoModule(L.LightningModule):
 
                     optimizers.extend(extra_optimizers)
                 else:
-                    raise ValueError(f"Invalid optimizer type: {type(optimizer)}")
+                    raise TypeError(f"Invalid optimizer type: {type(optimizer)}")
             elif isinstance(optimizer, dict):
                 if isinstance(module, nn.ModuleDict):
                     for key in optimizer:
@@ -143,7 +143,7 @@ class AutoModule(L.LightningModule):
                 else:
                     raise ValueError(f"Cannot use optimizer dict with non-ModuleDict module: {module}")
             else:
-                raise ValueError(f"Invalid optimizer type: {type(optimizer)}")
+                raise TypeError(f"Invalid optimizer type: {type(optimizer)}")
 
         if schedulers == []:
             if optimizers == []:
