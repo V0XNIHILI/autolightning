@@ -20,7 +20,6 @@ class AutoModuleKwargs(TypedDict, total=False):
     criterion: Optional[nn.Module]
     optimizer: Optional[OptimizerType]
     lr_scheduler: Optional[LrSchedulerType]
-    compiler: Optional[Callable[..., Callable]]
     metrics: Optional[MetricType]
     loss_log_key: Optional[str]
     log_metrics: bool
@@ -32,7 +31,6 @@ class AutoModuleKwargsNoCriterion(TypedDict, total=False):
     net: Optional[nn.Module]
     optimizer: Optional[OptimizerType]
     lr_scheduler: Optional[LrSchedulerType]
-    compiler: Optional[Callable[..., Callable]]
     metrics: Optional[MetricType]
     loss_log_key: Optional[str]
     log_metrics: bool
@@ -44,7 +42,6 @@ class AutoModuleKwargsNoNet(TypedDict, total=False):
     criterion: Optional[nn.Module]
     optimizer: Optional[OptimizerType]
     lr_scheduler: Optional[LrSchedulerType]
-    compiler: Optional[Callable[..., Callable]]
     metrics: Optional[MetricType]
     loss_log_key: Optional[str]
     log_metrics: bool

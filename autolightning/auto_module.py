@@ -24,7 +24,6 @@ class AutoModule(L.LightningModule):
                  criterion: Optional[nn.Module] = None,
                  optimizer: Optional[OptimizerType] = None,
                  lr_scheduler: Optional[LrSchedulerType] = None,
-                 compiler: Optional[Callable[..., Callable]] = None,
                  metrics: Optional[MetricType] = None,
                  loss_log_key: Optional[str] = "loss",
                  log_metrics: bool = True,
@@ -58,7 +57,6 @@ class AutoModule(L.LightningModule):
         super().__init__()
 
         self.net = net
-        self.compiler = compiler
         self.criterion = criterion
         self.optimizers_schedulers = {}
         self.metrics = {} if metrics == None else metrics
