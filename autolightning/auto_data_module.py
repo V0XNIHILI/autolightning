@@ -17,6 +17,7 @@ from torch_mate.data.utils import Transformed, PreLoaded
 STAGES = ["train", "val", "test", "predict"]
 ALLOWED_DATASET_KEYS = STAGES + ["defaults"]
 PRE_LOAD_MOMENT = "pre_load"
+ARGS_KEY = "args"
 
 TransformValue = Union[List[Callable], Callable]
 TransformType = Union[Dict[str, TransformValue], TransformValue]
@@ -46,30 +47,30 @@ def instantiate_datasets(dataset: Optional[Union[Dict[str, Dataset], Dict, Datas
         if isinstance(init["class_path"], Namespace):
             init["class_path"] = dict(init["class_path"])["class_path"]
 
-        if "args" in dataset and any(key in ALLOWED_DATASET_KEYS for key in dataset["args"].keys()) and all(isinstance(phase_val, dict) for phase_val in dataset["args"].values()):
+        if ARGS_KEY in dataset and any(key in ALLOWED_DATASET_KEYS for key in dataset[ARGS_KEY].keys()) and all(isinstance(phase_val, dict) for phase_val in dataset[ARGS_KEY].values()):
             # If any of the keys "train", "val", "test" or "predict" are present and they are all dictionaries, we build the datasets separately
 
             # Make sure no other keys are present except for the stages
-            assert set(dataset["args"].keys()) - set(ALLOWED_DATASET_KEYS) == set(), f"Unsupported keys in dataset configuration: {set(dataset['args'].keys()) - set(ALLOWED_DATASET_KEYS)}"
+            assert set(dataset[ARGS_KEY].keys()) - set(ALLOWED_DATASET_KEYS) == set(), f"Unsupported keys in dataset configuration: {set(dataset['args'].keys()) - set(ALLOWED_DATASET_KEYS)}"
 
-            defaults = dataset["args"].get("defaults", {})
+            defaults = dataset[ARGS_KEY].get("defaults", {})
 
             # only stage keys, then number of stages
             # stage keys and defaults, then number of stages + 1, except for when all stages are present
             keys_to_init = []
 
-            if "defaults" in dataset["args"]:
-                if len(dataset["args"]) == len(STAGES) + 1:
+            if "defaults" in dataset[ARGS_KEY]:
+                if len(dataset[ARGS_KEY]) == len(STAGES) + 1:
                     keys_to_init = STAGES
                 else:
-                    keys_to_init = dataset["args"]
+                    keys_to_init = dataset[ARGS_KEY]
             else:
-                keys_to_init = dataset["args"]
+                keys_to_init = dataset[ARGS_KEY]
 
             dataset_dict = {}
             
             for key in keys_to_init:
-                init["init_args"] = dict(defaults) | (dataset["args"].get(key, {}))
+                init["init_args"] = dict(defaults) | (dataset[ARGS_KEY].get(key, {}))
 
                 if type(init["class_path"]) is str:
                     dataset_dict[key] = instantiate_class(tuple(), init)
@@ -78,7 +79,7 @@ def instantiate_datasets(dataset: Optional[Union[Dict[str, Dataset], Dict, Datas
 
             return dataset_dict
         
-        return instantiate_class(tuple(), init | {"init_args": dataset.get("args", {})})
+        return instantiate_class(tuple(), init | {"init_args": dataset.get(ARGS_KEY, {})})
     
     raise ValueError(f"Unsupported dataset configuration: {dataset}")
 
