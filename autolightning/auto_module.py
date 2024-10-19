@@ -16,7 +16,7 @@ from lightning.pytorch.cli import OptimizerCallable, LRSchedulerCallable
 Phase = Literal["train", "val", "test"]
 
 MetricType = Dict[str, Union[Metric, Callable[..., Any]]]
-OptimizerType = Union[Optimizer, OptimizerCallable, List[Union[Optimizer, OptimizerCallable]], Tuple[Union[Optimizer, OptimizerCallable]], Dict[str, OptimizerCallable]]
+OptimizerType = Union[Optimizer, OptimizerCallable, Iterable[Union[Optimizer, OptimizerCallable]], Dict[str, OptimizerCallable]]
 LrSchedulerType = Union[LRSchedulerCallable, ]
 IterableOfModules = Iterable[nn.Module]
 
@@ -71,7 +71,7 @@ class AutoModule(L.LightningModule):
         self.optimizers_schedulers = {}
         self.metrics = {} if metrics == None else metrics
 
-        self.register_optimizer("*", optimizer, lr_scheduler)
+        self.register_optimizer(self, optimizer, lr_scheduler)
 
         self.loss_log_key = loss_log_key
         self.log_metrics = log_metrics
@@ -82,12 +82,12 @@ class AutoModule(L.LightningModule):
 
         self.save_hyperparameters(ignore=KEYS_TO_IGNORE)
 
-    def register_optimizer(self, name: str, optimizer: Optional[OptimizerCallable] = None, lr_scheduler: Optional[LRSchedulerCallable] = None):
+    def register_optimizer(self, module: nn.Module, optimizer: Optional[OptimizerCallable] = None, lr_scheduler: Optional[LRSchedulerCallable] = None):
         if optimizer != None:
-            if name in self.optimizers_schedulers:
-                warnings.warn(f"Optimizer '{name}' already exists in optimizers_schedulers. Overwriting it.")
+            if module in self.optimizers_schedulers:
+                warnings.warn(f"Optimizer for module '{module}' already exists in optimizers_schedulers. Overwriting it.")
 
-            self.optimizers_schedulers[name] = (optimizer, lr_scheduler)
+            self.optimizers_schedulers[module] = (optimizer, lr_scheduler)
         elif lr_scheduler != None:
             raise ValueError("Cannot register a scheduler when the optimizer is None")
 
@@ -116,7 +116,7 @@ class AutoModule(L.LightningModule):
         # If dict:
         #    - check if .net is a module dict, then assign each optimizer to the corresponding module
 
-        for name, (optimizer, scheduler) in self.optimizers_schedulers.items():
+        for module, (optimizer, scheduler) in self.optimizers_schedulers.items():
             if isinstance(optimizer, optim.Optimizer):
                 optimizers.append(optimizer)
 
@@ -126,7 +126,7 @@ class AutoModule(L.LightningModule):
                     else:
                         schedulers.append(scheduler(optimizer))
             elif callable(optimizer):
-                params = self.parameters_for_optimizer() if name == "*" else getattr(self, name).parameters()
+                params = self.parameters_for_optimizer() if module == self else module.parameters()
                 optimizers.append(optimizer(params))
 
                 if scheduler != None:
@@ -135,20 +135,16 @@ class AutoModule(L.LightningModule):
                 if all(isinstance(opt, optim.Optimizer) for opt in optimizer):
                     optimizers.extend(optimizer)
                 elif all(callable(opt) for opt in optimizer):
-                    module = self if name == "*" else getattr(self, name)
-
                     if isinstance(module, nn.ModuleList):
                         extra_optimizers = [opt(module[i].parameters()) for i, opt in enumerate(optimizer)]
                     else:
-                        params_call = self.parameters_for_optimizer if name == "*" else getattr(self, name).parameters
+                        params_call = params = self.parameters_for_optimizer if module == self else module.parameters
                         extra_optimizers = [opt(params_call()) for opt in optimizer]
 
                     optimizers.extend(extra_optimizers)
                 else:
                     raise ValueError(f"Invalid optimizer type: {type(optimizer)}")
             elif isinstance(optimizer, dict):
-                module = self if name == "*" else getattr(self, name)
-
                 if isinstance(module, nn.ModuleDict):
                     for key in optimizer:
                         optimizers.append(optimizer[key](module[key].parameters()))
@@ -181,15 +177,6 @@ class AutoModule(L.LightningModule):
 
     def lr_schedulers_dict(self):
         scheds = self.lr_schedulers()
-
-    def compile_net(self, net: Optional[Union[nn.Module, Callable]] = None, compiler: Optional[Callable] = None):
-        if compiler == None:
-            return net
-
-        if net == None:
-            raise ValueError("Net to be compiled was not specified")
-        
-        return compiler(net)
     
     def register_metric(self, name: str, metric: MetricType):
         if name in self.metrics:
@@ -212,10 +199,10 @@ class AutoModule(L.LightningModule):
         """A call to shared_step should result in either:
 
         - a single loss value
-        - a tuple of inputs for the loss function
+        - a tuple/list of inputs for the loss function
         - a dict containing "loss" and "metric" keys
-            where "loss" is the loss value (single value or list/tuple)
-            and "metric" is a dict containing the metric values or inputs to the metric function
+            where "loss" is the loss value or a tuple/list of inputs for the loss function
+            and "metric" is a dict containing the metric values, inputs to the metric function
             or a single value that is passed to all metrics
         """
 
@@ -228,6 +215,12 @@ class AutoModule(L.LightningModule):
         return phase == 'val'
 
     def shared_logged_step(self, phase: Phase, *args: Any, **kwargs: Any):
+        # step_out can be:
+        # - a tuple/iterable, all values of which will be fed into the loss function
+        #   and that can be used for metric computation
+        # - a dictionary with two keys: "loss" and (optionally) "metrics"
+        # - a torch tensor (the loss was already computed)
+        # - None
         step_out = self.shared_step(phase, *args, **kwargs)
 
         loss = None
@@ -244,6 +237,9 @@ class AutoModule(L.LightningModule):
 
             if "metrics" in step_out:
                 metric_inputs = step_out["metrics"]
+                assert len(step_out) == 2
+            else:
+                assert len(step_out) == 1
         else:
             loss = step_out
 
