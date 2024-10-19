@@ -15,7 +15,7 @@ IterableOfModules = Iterable[nn.Module]
 Phase = Literal["train", "val", "test"]
 
 
-class AutoModuleKwargs(TypedDict, net=None, criterion=None, optimizer=None, lr_scheduler=None, compiler=None, metrics=None, loss_log_key="loss", log_metrics=True, exclude_no_grad=True, disable_prog_bar=False):
+class AutoModuleKwargs(TypedDict, total=False):
     net: Optional[nn.Module]
     criterion: Optional[nn.Module]
     optimizer: Optional[OptimizerType]
@@ -28,7 +28,7 @@ class AutoModuleKwargs(TypedDict, net=None, criterion=None, optimizer=None, lr_s
     disable_prog_bar: bool
 
 
-class AutoModuleKwargsNoCriterion(TypedDict, net=None, optimizer=None, lr_scheduler=None, compiler=None, metrics=None, loss_log_key="loss", log_metrics=True, exclude_no_grad=True, disable_prog_bar=False):
+class AutoModuleKwargsNoCriterion(TypedDict, total=False):
     net: Optional[nn.Module]
     optimizer: Optional[OptimizerType]
     lr_scheduler: Optional[LrSchedulerType]
@@ -40,7 +40,7 @@ class AutoModuleKwargsNoCriterion(TypedDict, net=None, optimizer=None, lr_schedu
     disable_prog_bar: bool
 
 
-class AutoModuleKwargsNoNet(TypedDict, criterion=None, optimizer=None, lr_scheduler=None, compiler=None, metrics=None, loss_log_key="loss", log_metrics=True, exclude_no_grad=True, disable_prog_bar=False):
+class AutoModuleKwargsNoNet(TypedDict, total=False):
     criterion: Optional[nn.Module]
     optimizer: Optional[OptimizerType]
     lr_scheduler: Optional[LrSchedulerType]

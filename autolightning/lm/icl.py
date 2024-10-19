@@ -49,7 +49,7 @@ def icl_shared_step(module: nn.Module, batch):
     return (output, y_test)
 
 
-class ICLKwargs(TypedDict, sample_embedder=None, merge_data_strategy="flatten", combine_batch_and_samples=False):
+class ICLKwargs(TypedDict, total=False):
     sample_embedder: Optional[nn.Module]
     merge_data_strategy: str
     combine_batch_and_samples: bool
@@ -72,7 +72,7 @@ class ICL(ICLMixin, Supervised):
         return icl_shared_step(self, batch)
 
 
-class ICLClassifierKwargs(ICLKwargs, AutoModuleKwargs)
+class ICLClassifierKwargs(ICLKwargs, AutoModuleKwargs):
     pass
 
 
