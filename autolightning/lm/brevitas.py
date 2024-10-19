@@ -1,4 +1,4 @@
-from typing import Optional, List, Any, Unpack
+from typing import Optional, List, Any, Dict, Union, Unpack
 from contextlib import nullcontext
 
 import torch
@@ -7,10 +7,12 @@ import torch.nn as nn
 from lightning.pytorch.utilities.types import STEP_OUTPUT
 
 from brevitas.quant_tensor import QuantTensor
-from brevitas.quant.solver import WeightQuantSolver, ActQuantSolver, BiasQuantSolver
+from brevitas.nn.mixin.parameter import WeightQuantType, BiasQuantType
+from brevitas.nn.mixin.act import ActQuantType
 from brevitas.graph.calibrate import bias_correction_mode, calibration_mode, norm_correction_mode
 
 from brevitas_utils import create_qat_ready_model
+from brevitas_utils.creation import create_quant_class
 
 from . import Supervised, Classifier, Prototypical
 from ..types import AutoModuleKwargs
@@ -33,13 +35,30 @@ def get_first_context(contexts_to_enter: List[str], contexts_exited: List[str]):
     return None
 
 
+def weight_quantizer(class_paths: List[str], init_args: Dict[str, Any]) -> WeightQuantType:
+    return create_quant_class(class_paths, init_args)
+
+
+def act_quantizer(class_paths: List[str], init_args: Dict[str, Any]) -> ActQuantType:
+    return create_quant_class(class_paths, init_args)
+
+
+def bias_quantizer(class_paths: List[str], init_args: Dict[str, Any]) -> BiasQuantType:
+    return create_quant_class(class_paths, init_args)
+
+
 class BrevitasMixin:
+    # Using quoated types as the base class of these types are
+    # dynamically generated and hard to type check using 
+    # jsonargparse. I get this error mainly:
+    # - 'Injector' can not resolve attribute '__origin__'
+
     def __init__(self,
-                 weight_quant: WeightQuantSolver,
-                 act_quant: Optional[ActQuantSolver] = None,
-                 bias_quant: Optional[BiasQuantSolver] = None,
-                 in_quant: Optional[ActQuantSolver] = None,
-                 out_quant: Optional[ActQuantSolver] = None,
+                 weight_quant: Optional["WeightQuantType"] = None,
+                 act_quant: Optional["ActQuantType"] = None,
+                 bias_quant: Optional["BiasQuantType"] = None,
+                 in_quant: Optional["ActQuantType"] = None,
+                 out_quant: Optional["ActQuantType"] = None,
                  load_float_weights_into_model: bool = True,
                  remove_dropout_layers: bool = True,
                  fold_batch_norm_layers: bool = True,
@@ -47,7 +66,7 @@ class BrevitasMixin:
                  calibrate: bool = False,
                  correct_biases: bool = False,
                  correct_norms: bool = False,
-                 skip_modules: Optional[List[type[nn.Module]]] = None,
+                 skip_modules: Optional[List[Union[type[nn.Module], str]]] = None,
                  limit_calibration_batches: Optional[int] = None,
                  **kwargs: Unpack[AutoModuleKwargs]):
         super().__init__(**kwargs)
@@ -74,7 +93,7 @@ class BrevitasMixin:
         self.prepare_model()
 
     def prepare_model(self):
-        assert self.net != None, "Default to quantize model ('self.net') is not set."
+        assert self.net != None, "Default model to quantize ('self.net') is not set."
 
         self.net = create_qat_ready_model(
             self.net,
