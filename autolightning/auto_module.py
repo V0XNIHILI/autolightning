@@ -1,24 +1,16 @@
-from typing import Dict, List, Optional, Union, Tuple, Callable, Any, Iterator, Literal, Iterable
+from typing import Dict, Optional, Callable, Any, Iterator
 import warnings
 
 import torch.nn as nn
 import torch.optim as optim
 from torch.nn.parameter import Parameter
-from torch.optim.optimizer import Optimizer
 
 import lightning as L
 from pytorch_lightning.utilities.types import OptimizerLRScheduler
 
-from torchmetrics.metric import Metric
 from lightning.pytorch.cli import OptimizerCallable, LRSchedulerCallable
 
-
-Phase = Literal["train", "val", "test"]
-
-MetricType = Dict[str, Union[Metric, Callable[..., Any]]]
-OptimizerType = Union[Optimizer, OptimizerCallable, Iterable[Union[Optimizer, OptimizerCallable]], Dict[str, OptimizerCallable]]
-LrSchedulerType = Union[LRSchedulerCallable, ]
-IterableOfModules = Iterable[nn.Module]
+from .types import MetricType, OptimizerType, LrSchedulerType, Phase
 
 
 LOG_PHASE_KEYS = {"train", "val", "test", "predict"}

@@ -1,4 +1,4 @@
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Unpack
 from contextlib import nullcontext
 
 import torch
@@ -13,6 +13,7 @@ from brevitas.graph.calibrate import bias_correction_mode, calibration_mode, nor
 from brevitas_utils import create_qat_ready_model
 
 from . import Supervised, Classifier, Prototypical
+from ..types import AutoModuleKwargs
 
 
 def __getitem__(self, indices):
@@ -48,7 +49,7 @@ class BrevitasMixin:
                  correct_norms: bool = False,
                  skip_modules: Optional[List[type[nn.Module]]] = None,
                  limit_calibration_batches: Optional[int] = None,
-                 **kwargs):
+                 **kwargs: Unpack[AutoModuleKwargs]):
         super().__init__(**kwargs)
 
         if allow_quant_tensor_slicing:

@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Unpack
 
 from typing import Tuple, List
 
@@ -11,6 +11,7 @@ from sklearn.linear_model import LogisticRegression
 from torch_mate.typing import OptionalBatchTransform
 
 from autolightning.lm import Classifier
+from autolightning.types import AutoModuleKwargs
 
 
 MetaSample = Tuple[Tuple[torch.Tensor, torch.Tensor],
@@ -114,7 +115,7 @@ def prototypical_shared_step(module, batch):
 
 
 class PrototypicalMixin:
-    def __init__(self, metric: MetricType = "euclidean", average_support_embeddings: bool = True, **kwargs):
+    def __init__(self, metric: MetricType = "euclidean", average_support_embeddings: bool = True, **kwargs: Unpack[AutoModuleKwargs]):
         super().__init__(**kwargs)
 
         self.metric = metric

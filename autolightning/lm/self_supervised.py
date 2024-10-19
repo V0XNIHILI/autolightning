@@ -1,10 +1,10 @@
-from typing import Optional
+from typing import Optional, Unpack
 
 import torch
 import torch.nn as nn
 
 from autolightning import AutoModule
-from autolightning.types import Phase
+from autolightning.types import Phase, AutoModuleKwargsNoCriterion
 
 
 class ContrastiveLoss(nn.Module):
@@ -39,7 +39,7 @@ def siamese_shared_step(module: AutoModule, batch):
 
 
 class SiameseMixin:
-    def __init__(self, criterion: Optional[nn.Module] = None, **kwargs):
+    def __init__(self, criterion: Optional[nn.Module] = None, **kwargs: Unpack[AutoModuleKwargsNoCriterion]):
         if criterion == None:
             criterion = ContrastiveLoss()
 
@@ -66,7 +66,7 @@ def triplet_shared_step(module: AutoModule, batch):
 
 
 class TripletMixin:
-    def __init__(self, criterion: Optional[nn.Module] = None, **kwargs):
+    def __init__(self, criterion: Optional[nn.Module] = None, **kwargs: Unpack[AutoModuleKwargsNoCriterion]):
         if criterion == None:
             criterion = nn.TripletMarginLoss()
 

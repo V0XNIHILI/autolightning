@@ -1,11 +1,11 @@
-from typing import Optional
+from typing import Optional, TypedDict, Unpack
 
 import torch
 import torch.nn as nn
 
 from autolightning.lm.supervised import Supervised
 from autolightning.lm.classifier import ClassifierMixin
-from autolightning.types import Phase
+from autolightning.types import Phase, AutoModuleKwargs
 
 
 def icl_forward(head_or_net: nn.Module, X_train, y_train, X_test, sample_embedder: Optional[nn.Module] = None, merge_data_strategy: str = "flatten", combine_batch_and_samples: bool = False):
@@ -49,8 +49,14 @@ def icl_shared_step(module: nn.Module, batch):
     return (output, y_test)
 
 
+class ICLKwargs(TypedDict, sample_embedder=None, merge_data_strategy="flatten", combine_batch_and_samples=False):
+    sample_embedder: Optional[nn.Module]
+    merge_data_strategy: str
+    combine_batch_and_samples: bool
+
+
 class ICLMixin:
-    def __init__(self, sample_embedder: Optional[nn.Module] = None, merge_data_strategy: str = "flatten", combine_batch_and_samples: bool = False, **kwargs):
+    def __init__(self, sample_embedder: Optional[nn.Module] = None, merge_data_strategy: str = "flatten", combine_batch_and_samples: bool = False, **kwargs: Unpack[AutoModuleKwargs]):
         super().__init__(**kwargs)
 
         self.sample_embedder = sample_embedder
@@ -66,8 +72,12 @@ class ICL(ICLMixin, Supervised):
         return icl_shared_step(self, batch)
 
 
+class ICLClassifierKwargs(ICLKwargs, AutoModuleKwargs)
+    pass
+
+
 class ICLClassifier(ClassifierMixin, ICL):
-    def __init__(self, label_embedder: Optional[nn.Embedding] = None, **kwargs):
+    def __init__(self, label_embedder: Optional[nn.Embedding] = None, **kwargs: Unpack[ICLClassifierKwargs]):
         super().__init__(**kwargs)
     
         self.label_embedder = label_embedder

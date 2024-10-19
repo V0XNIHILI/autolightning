@@ -1,9 +1,10 @@
-from typing import Optional
+from typing import Optional, Unpack
 
 import torch
 import torch.nn as nn
 
 from .. import AutoModule
+from ..types import AutoModuleKwargsNoNet
 
 
 def distilled_forward(student: nn.Module, student_head : Optional[nn.Module] = None, student_regressor : Optional[nn.Module]= None, *args, **kwargs):
@@ -33,13 +34,13 @@ def distilled_shared_step(module: nn.Module, teacher_only: nn.Module, targets, *
 
 
 class DistilledMixin:
-    def __init__(self, student_net: nn.Module, teacher_net: nn.Module, student_head_net: Optional[nn.Module] = None, student_regressor_net: Optional[nn.Module] = None, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, student_net: nn.Module, teacher_net: nn.Module, student_head_net: Optional[nn.Module] = None, student_regressor_net: Optional[nn.Module] = None, **kwargs: Unpack[AutoModuleKwargsNoNet]):
+        super().__init__(net=None, **kwargs)
 
         if student_head_net == None and student_regressor_net != None:
             raise ValueError("Cannot use student_regressor without student_head")
 
-        self.net = student_net
+        self.student_net = student_net
         self.teacher = teacher_net
         self.student_head = student_head_net
 
@@ -49,7 +50,7 @@ class DistilledMixin:
 
 class Distilled(DistilledMixin, AutoModule):
     def forward(self, *args, **kwargs):
-        return distilled_forward(self.net, self.teacher, self.student_head, self.student_regressor)
+        return distilled_forward(self.student_net, self.teacher, self.student_head, self.student_regressor)
     
     def shared_step(self, phase: str, batch, batch_idx):
         return distilled_shared_step(self, self.teacher, batch[1], batch[0])
