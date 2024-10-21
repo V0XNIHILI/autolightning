@@ -1,4 +1,4 @@
-from typing import Literal, Unpack
+from typing import Literal
 
 from typing import Tuple, List
 
@@ -11,7 +11,7 @@ from sklearn.linear_model import LogisticRegression
 from torch_mate.typing import OptionalBatchTransform
 
 from autolightning.lm import Classifier
-from autolightning.types import AutoModuleKwargs
+from autolightning.types import AutoModuleKwargs, Unpack
 
 
 MetaSample = Tuple[Tuple[torch.Tensor, torch.Tensor],

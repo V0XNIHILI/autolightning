@@ -1,11 +1,11 @@
-from typing import Optional, TypedDict, Unpack
+from typing import Optional, TypedDict
 
 import torch
 import torch.nn as nn
 
 from autolightning.lm.supervised import Supervised
 from autolightning.lm.classifier import ClassifierMixin
-from autolightning.types import Phase, AutoModuleKwargs
+from autolightning.types import Phase, AutoModuleKwargs, Unpack
 
 
 def icl_forward(head_or_net: nn.Module, X_train, y_train, X_test, sample_embedder: Optional[nn.Module] = None, merge_data_strategy: str = "flatten", combine_batch_and_samples: bool = False):

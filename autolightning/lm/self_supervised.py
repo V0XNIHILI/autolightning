@@ -1,10 +1,10 @@
-from typing import Optional, Unpack
+from typing import Optional
 
 import torch
 import torch.nn as nn
 
 from autolightning import AutoModule
-from autolightning.types import Phase, AutoModuleKwargsNoCriterion
+from autolightning.types import Phase, AutoModuleKwargsNoCriterion, Unpack
 
 
 class ContrastiveLoss(nn.Module):
