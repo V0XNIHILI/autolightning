@@ -89,11 +89,11 @@ class BrevitasMixin:
 
         self.net = create_qat_ready_model(
             self.net,
-            weight_quant_cfg=self.weight_quant,
-            act_quant_cfg=self.act_quant,
-            bias_quant_cfg=self.bias_quant,
-            in_quant_cfg=self.in_quant,
-            out_quant_cfg=self.out_quant,
+            weight_quant=self.weight_quant,
+            act_quant=self.act_quant,
+            bias_quant=self.bias_quant,
+            in_quant=self.in_quant,
+            out_quant=self.out_quant,
             load_float_weights_into_model=self.load_float_weights_into_model,
             remove_dropout_layers=self.remove_dropout_layers,
             fold_batch_norm_layers=self.fold_batch_norm_layers,
