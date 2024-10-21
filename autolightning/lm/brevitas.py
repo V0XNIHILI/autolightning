@@ -1,4 +1,4 @@
-from typing import Optional, List, Any, Dict, Union, Unpack
+from typing import Optional, List, Any, Dict, Union
 from contextlib import nullcontext
 
 import torch
@@ -15,7 +15,7 @@ from brevitas_utils import create_qat_ready_model
 from brevitas_utils.creation import create_quant_class
 
 from . import Supervised, Classifier, Prototypical
-from ..types import AutoModuleKwargs
+from ..types import AutoModuleKwargs, Unpack
 
 
 def __getitem__(self, indices):

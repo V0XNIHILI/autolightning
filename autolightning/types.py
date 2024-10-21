@@ -1,4 +1,9 @@
-from typing import Dict, Optional, Union, Callable, Any, Literal, Iterable, TypedDict, Unpack
+from typing import Dict, Optional, Union, Callable, Any, Literal, Iterable, TypedDict
+
+try:
+    from typing import Unpack  # Python 3.11+
+except ImportError:
+    from typing_extensions import Unpack  # For older Python versions
 
 import torch.nn as nn
 from torch.optim.optimizer import Optimizer

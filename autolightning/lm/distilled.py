@@ -1,10 +1,10 @@
-from typing import Optional, Unpack
+from typing import Optional
 
 import torch
 import torch.nn as nn
 
 from .. import AutoModule
-from ..types import AutoModuleKwargsNoNet
+from ..types import AutoModuleKwargsNoNet, Unpack
 
 
 def distilled_forward(student: nn.Module, student_head : Optional[nn.Module] = None, student_regressor : Optional[nn.Module]= None, *args, **kwargs):
