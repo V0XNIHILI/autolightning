@@ -20,6 +20,15 @@ LIGHTNING_STATE_DICT_KEYS = [
 ]
 
 
+def _import_module(module_path: str) -> Any:
+    module_name, function_name = module_path.rsplit(".")
+
+    function_module = importlib.import_module(module_name)
+    function = getattr(function_module, function_name)
+
+    return function
+
+
 def load(module: nn.Module, file_path: str, submodule_path: Optional[str], strict: bool = True, assign: bool = False, **kwargs: Any) -> nn.Module:
     state_dict = torch.load(file_path, **kwargs)
 
@@ -43,9 +52,6 @@ def load(module: nn.Module, file_path: str, submodule_path: Optional[str], stric
 
 
 def compile(module: nn.Module, compiler_path: str, compiler_kwargs: Optional[Dict[str, Any]] = None) -> nn.Module:
-    module_name, function_name = compiler_path.rsplit(".")
-
-    function_module = importlib.import_module(module_name)
-    function = getattr(function_module, function_name)
+    function = _import_module(compiler_path)
 
     return function(module, **(compiler_kwargs if compiler_kwargs != None else {}))

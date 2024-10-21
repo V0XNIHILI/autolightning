@@ -1,33 +1,22 @@
 from typing import Optional, List, Any, Dict, Union
 from contextlib import nullcontext
 
-import torch
 import torch.nn as nn
 
 from lightning.pytorch.utilities.types import STEP_OUTPUT
 
-from brevitas.quant_tensor import QuantTensor
-from brevitas.nn.mixin.parameter import WeightQuantType, BiasQuantType
-from brevitas.nn.mixin.act import ActQuantType
+from brevitas.inject import _InjectorType
 from brevitas.graph.calibrate import bias_correction_mode, calibration_mode, norm_correction_mode
 
-from brevitas_utils import create_qat_ready_model
-from brevitas_utils.creation import create_quant_class
+from brevitas_utils import create_qat_ready_model, allow_quant_tensor_slicing as allow_slicing
+from brevitas_utils.creation import create_quantizer
 
 from . import Supervised, Classifier, Prototypical
+from ..utils import _import_module
 from ..types import AutoModuleKwargs, Unpack
 
 
-def __getitem__(self, indices):
-    # Only allow indexing on QuantTensors with scalar scale
-    if self.scale == None or self.scale.shape == torch.Size([]):
-        return QuantTensor(self.value[indices], self.scale, self.zero_point, self.bit_width, self.signed, self.training)
-
-    # Do not yet support indexing on QuantTensors with scale per channel, as it is not directly clear how to handle this
-    raise RuntimeError("QuantTensor with scale of shape {} is not supported.".format(self.scale.shape))
-
-
-def get_first_context(contexts_to_enter: List[str], contexts_exited: List[str]):
+def _get_first_context(contexts_to_enter: List[str], contexts_exited: List[str]):
     for context in contexts_to_enter:
         if context not in contexts_exited:
             return context
@@ -35,30 +24,22 @@ def get_first_context(contexts_to_enter: List[str], contexts_exited: List[str]):
     return None
 
 
-def weight_quantizer(class_paths: List[str], init_args: Dict[str, Any]) -> WeightQuantType:
-    return create_quant_class(class_paths, init_args)
-
-
-def act_quantizer(class_paths: List[str], init_args: Dict[str, Any]) -> ActQuantType:
-    return create_quant_class(class_paths, init_args)
-
-
-def bias_quantizer(class_paths: List[str], init_args: Dict[str, Any]) -> BiasQuantType:
-    return create_quant_class(class_paths, init_args)
+def quantizer(class_paths: List[str], init_args: Optional[Dict[str, Any]] = None) -> _InjectorType:
+    return create_quantizer(class_paths, init_args)
 
 
 class BrevitasMixin:
-    # Using quoated types as the base class of these types are
-    # dynamically generated and hard to type check using 
-    # jsonargparse. I get this error mainly:
+    # Using _InjectorType as quant type, since the base class
+    # of these types are dynamically generated and hard to
+    # type check using jsonargparse. I get this error mainly:
     # - 'Injector' can not resolve attribute '__origin__'
 
     def __init__(self,
-                 weight_quant: Optional["WeightQuantType"] = None,
-                 act_quant: Optional["ActQuantType"] = None,
-                 bias_quant: Optional["BiasQuantType"] = None,
-                 in_quant: Optional["ActQuantType"] = None,
-                 out_quant: Optional["ActQuantType"] = None,
+                 weight_quant: Optional[_InjectorType] = None,
+                 act_quant: Optional[_InjectorType] = None,
+                 bias_quant: Optional[_InjectorType] = None,
+                 in_quant: Optional[_InjectorType] = None,
+                 out_quant: Optional[_InjectorType] = None,
                  load_float_weights_into_model: bool = True,
                  remove_dropout_layers: bool = True,
                  fold_batch_norm_layers: bool = True,
@@ -72,7 +53,7 @@ class BrevitasMixin:
         super().__init__(**kwargs)
 
         if allow_quant_tensor_slicing:
-            QuantTensor.__getitem__ = __getitem__
+            allow_slicing()
 
         self.weight_quant = weight_quant
         self.act_quant = act_quant
@@ -95,6 +76,11 @@ class BrevitasMixin:
     def prepare_model(self):
         assert self.net != None, "Default model to quantize ('self.net') is not set."
 
+        if self.skip_modules != None:
+            skip_modules = [_import_module(module) if isinstance(module, str) else module for module in self.skip_modules]
+        else:
+            skip_modules = None
+
         self.net = create_qat_ready_model(
             self.net,
             weight_quant_cfg=self.weight_quant,
@@ -105,7 +91,7 @@ class BrevitasMixin:
             load_float_weights_into_model=self.load_float_weights_into_model,
             remove_dropout_layers=self.remove_dropout_layers,
             fold_batch_norm_layers=self.fold_batch_norm_layers,
-            skip_modules=self.skip_modules
+            skip_modules=skip_modules
         )
 
         self.calibrate_context = calibration_mode(self.net) if self.calibrate else nullcontext()
@@ -130,7 +116,7 @@ class BrevitasMixin:
         out = super().on_train_batch_start(batch, batch_idx)
 
         if self.current_context is None:
-            context_name = get_first_context(self.contexts_to_enter, self.contexts_exited)
+            context_name = _get_first_context(self.contexts_to_enter, self.contexts_exited)
 
             if context_name is not None:
                 context = getattr(self, context_name)
@@ -146,7 +132,7 @@ class BrevitasMixin:
             self.current_context.__exit__(None, None, None)
             self.current_context = None
 
-            current_context_name = get_first_context(self.contexts_to_enter, self.contexts_exited)
+            current_context_name = _get_first_context(self.contexts_to_enter, self.contexts_exited)
             self.contexts_exited.append(current_context_name)
 
             print(f"Completed {current_context_name[:-8]} operation.")
