@@ -23,3 +23,5 @@ lightning_logs
 
 test_cfgs
 test_wandb_lightning
+configs
+*.ipynb
