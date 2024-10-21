@@ -1,5 +1,6 @@
-from typing import Any, Optional
+from typing import Any, Optional, Dict
 from collections import OrderedDict
+import importlib
 
 import torch
 import torch.nn as nn
@@ -39,3 +40,12 @@ def load(module: nn.Module, file_path: str, submodule_path: Optional[str], stric
     module.load_state_dict(state_dict, strict=strict, assign=assign)
     
     return module
+
+
+def compile(module: nn.Module, compiler_path: str, compiler_kwargs: Optional[Dict[str, Any]] = None) -> nn.Module:
+    module_name, function_name = compiler_path.rsplit(".")
+
+    function_module = importlib.import_module(module_name)
+    function = getattr(function_module, function_name)
+
+    return function(module, **(compiler_kwargs if compiler_kwargs != None else {}))
