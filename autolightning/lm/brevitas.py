@@ -141,13 +141,14 @@ class BrevitasMixin:
         super().on_train_batch_end(outputs, batch, batch_idx)
 
         if self.limit_calibration_batches is not None:
-            if batch_idx == self.limit_calibration_batches:
+            if batch_idx % self.limit_calibration_batches == 0:
                 self.exit_quant_context_if_exists()
 
     def on_train_epoch_end(self) -> None:
         super().on_train_epoch_end()
         
-        self.exit_quant_context_if_exists()
+        if self.limit_calibration_batches == None:
+            self.exit_quant_context_if_exists()
 
     def training_step(self, *args, **kwargs):
         output = super().training_step(*args, **kwargs)
