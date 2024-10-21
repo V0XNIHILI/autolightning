@@ -1,6 +1,5 @@
-from typing import Any, Optional, Dict
+from typing import Any, Optional
 from collections import OrderedDict
-import importlib
 
 import torch
 import torch.nn as nn
@@ -20,8 +19,8 @@ LIGHTNING_STATE_DICT_KEYS = [
 ]
 
 
-def load(module: nn.Module, path: str, submodule_path: Optional[str], strict: bool = True, assign: bool = False, **kwargs: Any) -> nn.Module:
-    state_dict = torch.load(path, **kwargs)
+def load(module: nn.Module, file_path: str, submodule_path: Optional[str], strict: bool = True, assign: bool = False, **kwargs: Any) -> nn.Module:
+    state_dict = torch.load(file_path, **kwargs)
 
     # Check if the state dict is a Lightning state dict
     if all(key in state_dict for key in LIGHTNING_STATE_DICT_KEYS):
@@ -40,12 +39,3 @@ def load(module: nn.Module, path: str, submodule_path: Optional[str], strict: bo
     module.load_state_dict(state_dict, strict=strict, assign=assign)
     
     return module
-
-
-def compile(net: nn.Module, compiler_path: str, compiler_kwargs: Dict[str, Any]) -> nn.Module:
-    module_name, function_name = compiler_path.rsplit(".")
-
-    module = importlib.import_module(module_name)
-    function = getattr(module, function_name)
-
-    return function(net, **compiler_kwargs)
