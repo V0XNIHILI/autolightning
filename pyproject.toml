@@ -28,6 +28,10 @@ autolightning = "autolightning.cli:main"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.metadata]
+# To allow installation of the package from the git repository
+allow-direct-references = true
+
 [project.urls]
 "Homepage" = "https://github.com/V0XNIHILI/autolightning"
 "Bug Tracker" = "https://github.com/V0XNIHILI/autolightning/issues"
