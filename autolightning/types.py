@@ -52,3 +52,22 @@ class AutoModuleKwargsNoNet(TypedDict, total=False):
     log_metrics: bool
     exclude_no_grad: bool
     disable_prog_bar: bool
+
+
+class AutoDataModuleKwargs(TypedDict, total=False):
+    dataset: Optional[Union[Dict[str, Any], Dict, Any]]
+    dataloaders: Optional[Dict]
+    transforms: Optional[Callable]
+    target_transforms: Optional[Callable]
+    batch_transforms: Optional[Callable]
+    requires_prepare: bool
+    pre_load: Union[Dict[str, bool], bool]
+    random_split: Optional[Dict[str, Union[Union[int, float], Union[str, Dict[str, Union[int, float]]]]]]
+
+
+class AutoDataModuleKwargsNoDatsetPrepareSplit(TypedDict, total=False):
+    dataloaders: Optional[Dict]
+    transforms: Optional[Callable]
+    target_transforms: Optional[Callable]
+    batch_transforms: Optional[Callable]
+    pre_load: Union[Dict[str, bool], bool]

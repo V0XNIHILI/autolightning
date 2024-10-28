@@ -1,6 +1,7 @@
 from typing import Optional, List, Any, Dict, Union
 from contextlib import nullcontext
 
+import torch
 import torch.nn as nn
 
 from lightning.pytorch.utilities.types import STEP_OUTPUT
@@ -8,6 +9,7 @@ from lightning.pytorch.utilities.types import STEP_OUTPUT
 from brevitas.inject import _InjectorType
 from brevitas.graph.calibrate import bias_correction_mode, calibration_mode, norm_correction_mode
 
+import brevitas
 from brevitas_utils import create_qat_ready_model, allow_quant_tensor_slicing as allow_slicing
 from brevitas_utils.creation import create_quantizer
 
@@ -44,6 +46,7 @@ class BrevitasMixin:
                  remove_dropout_layers: bool = True,
                  fold_batch_norm_layers: bool = True,
                  allow_quant_tensor_slicing: bool = False,
+                 enable_brevitas_jit: bool = False,
                  calibrate: bool = False,
                  correct_biases: bool = False,
                  correct_norms: bool = False,
@@ -51,6 +54,9 @@ class BrevitasMixin:
                  limit_calibration_batches: Optional[int] = None,
                  **kwargs: Unpack[AutoModuleKwargs]):
         super().__init__(**kwargs)
+
+        if enable_brevitas_jit:
+            brevitas.config.JIT_ENABLED = 1
 
         if allow_quant_tensor_slicing:
             allow_slicing()
@@ -83,11 +89,11 @@ class BrevitasMixin:
 
         self.net = create_qat_ready_model(
             self.net,
-            weight_quant_cfg=self.weight_quant,
-            act_quant_cfg=self.act_quant,
-            bias_quant_cfg=self.bias_quant,
-            in_quant_cfg=self.in_quant,
-            out_quant_cfg=self.out_quant,
+            weight_quant=self.weight_quant,
+            act_quant=self.act_quant,
+            bias_quant=self.bias_quant,
+            in_quant=self.in_quant,
+            out_quant=self.out_quant,
             load_float_weights_into_model=self.load_float_weights_into_model,
             remove_dropout_layers=self.remove_dropout_layers,
             fold_batch_norm_layers=self.fold_batch_norm_layers,
@@ -112,13 +118,17 @@ class BrevitasMixin:
         self.contexts_exited = []
         self.current_context = None
 
+        self.no_grad_context = torch.no_grad()
+
     def on_train_batch_start(self, batch: Any, batch_idx: int) -> Optional[int]:
         out = super().on_train_batch_start(batch, batch_idx)
 
-        if self.current_context is None:
+        if self.current_context is None and self.limit_calibration_batches != 0:
             context_name = _get_first_context(self.contexts_to_enter, self.contexts_exited)
 
             if context_name is not None:
+                self.no_grad_context.__enter__()
+
                 context = getattr(self, context_name)
                 context.__enter__()
                 self.current_context = context
@@ -132,6 +142,8 @@ class BrevitasMixin:
             self.current_context.__exit__(None, None, None)
             self.current_context = None
 
+            self.no_grad_context.__exit__(None, None, None)
+
             current_context_name = _get_first_context(self.contexts_to_enter, self.contexts_exited)
             self.contexts_exited.append(current_context_name)
 
@@ -141,7 +153,7 @@ class BrevitasMixin:
         super().on_train_batch_end(outputs, batch, batch_idx)
 
         if self.limit_calibration_batches is not None:
-            if batch_idx % self.limit_calibration_batches == 0:
+            if (batch_idx + 1) % self.limit_calibration_batches == 0:
                 self.exit_quant_context_if_exists()
 
     def on_train_epoch_end(self) -> None:

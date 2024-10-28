@@ -1,8 +1,8 @@
 from . import AutoDataModule
-
+from .types import AutoDataModuleKwargsNoDatsetPrepareSplit, Unpack
 
 class MNIST(AutoDataModule):
-    def __init__(self, root: str, download: bool = False, val_percentage: float = 0.1, **kwargs):
+    def __init__(self, root: str, download: bool = False, val_percentage: float = 0.1, **kwargs: Unpack[AutoDataModuleKwargsNoDatsetPrepareSplit]):
         super().__init__(
             dataset={
                 "class": "torchvision.datasets.MNIST",
