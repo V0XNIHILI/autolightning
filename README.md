@@ -23,222 +23,52 @@ pip install -e .
 
 ## Example usage
 
-### 1. Define the configuration
+### In a notebook or script
 
-To define a complete configuration, you can use the following top-level keys:
+#### Supervised learning
 
-```python
-cfg = {
-    "learner": {...},
-    "criterion": {...},
-    "lr_scheduler": {...}, # Optional
-    "model": {...},
-    "optimizer": {...},
-
-    "training": {...}, # Optional
-    "seed": ..., # Optional
-    "dataset": {...}, # Optional
-    "dataloaders": {...}, # Optional
-}
-
-```
-
-For example, to train a LeNet5 on MNIST with early stopping and learning rate stepping, the configuration can be defined in one of the following ways:
-
-#### Option 1: A (regular) dictionary
-
-Note that I use `DotMap` here to define the configuration, but you can use any other dictionary-like object, or use tools like OmegaConf or Hydra to define the configuration.
+To run supervised learning on MNIST, with a simple FC layer, the following code is all you need:
 
 ```python
-# filename: main.py
-# -----------------
+from autolightning.lm import Classifier
+from autolightning.datasets import MNIST
 
-from dotmap import DotMap
+from functools import partial
 
-cfg = DotMap()
+import torch
+import torch.nn as nn
 
-# Specify the learner and its configuration
-# Without having any dots in the name, the import will be done from
-# the `autolightning.lm` module
-cfg.learner.name = "SupervisedLearner"
-cfg.learner.cfg = {
-    # Indicate whether classification accuracy should be computed
-    "classification": True,
-    # Optionally specify for which ks the top-k accuracy should be computed
-    # "topk": [1, 5],
-}
+from torchvision import transforms
 
-# Select the criterion and its configuration
-cfg.criterion.name = 'CrossEntropyLoss'
-# Optionally specify the configuration for the criterion:
-# cfg.criterion.cfg = {
-#     'reduction': 'mean'
-# }
+net = nn.Linear(28*28, 7)
 
-# Optionally specify the learning rate scheduler and its configuration
-cfg.lr_scheduler.scheduler = {
-    "name": "StepLR",
-    "cfg": {
-        "step_size": 2,
-        "verbose": True,
-    },
-}
+model = Classifier(
+    net=net, 
+    optimizer=torch.optim.Adam(net.parameters(), lr=0.003)
+)
 
-# Specify the model and its configuration
-cfg.model.name = 'torch_mate.models.LeNet5BNMaxPool'
-cfg.model.cfg.num_classes = 10
-
-# Optionally specify a compilation configuration
-cfg.model.extra.compile = {
-    'name': 'torch.compile'
-}
-
-# Specify the optimizer and its configuration
-cfg.optimizer.name = 'Adam'
-cfg.optimizer.cfg = {"lr": 0.007}
-
-# Specify the training configuration (passed directly to the PyTorch
-# Lightning Trainer). The `early_stopping` configuration is optional
-# and will be used to configure the early stopping callback.
-cfg.training = {
-    'max_epochs': 100,
-    'early_stopping': {
-        'monitor': 'val/loss',
-        'patience': 10,
-        'mode': 'min'
-    },
-}
-
-# Set the seed for reproducibility
-cfg.seed = 4223747124
-
-# Specify the dataset and its configuration.
-# Without having any dots in the name, the import will be done from
-# the `autolightning.datasets` module
-cfg.dataset.name = 'MagicData'
-cfg.dataset.cfg = {
-    "name": "MNIST", # Can also be torchvision.datasets.MNIST for example
-    "val_percentage": 0.1
-}
-cfg.dataset.kwargs = {
-    "root": './data',
-    "download": True
-}
-
-# Specify the transforms and their configuration
-# Note that you can specify .pre (common pre-transform), .train
-# .val/.test/.predict (specific transforms for each split) and
-# .post (common post-transform). The complete transforms will
-# then be built automatically. The same goes for target_transforms
-# via: cfg.dataset.target_transforms
-cfg.dataset.transforms.pre = [
-    {'name': 'ToTensor'},
-    {'name': 'Resize', 'cfg': {'size': (28, 28)}},
-]
-
-# Optionally, specify a pre-device and post-device transfer
-# batch transform via: cfg.dataset.batch_transforms.pre and
-# cfg.dataset.batch_transforms.post in the same manner
-# as for the other transforms.
-
-# Specify the data loaders and their configuration (where default
-# is the fallback configuration for all data loaders)
-cfg.dataloaders = {
-    'default': {
-        'num_workers': 4,
-        'prefetch_factor': 16,
-        'persistent_workers': True,
-        'batch_size': 256,
-    },
-    'train': {
-        'batch_size': 512
-    }
-}
-```
-
-Note that the configuration can also contain references to classes directly, without the relative import path. This is practical for example when you define a model class in the same file as the configuration. For example:
-
-```python
-class LeNet5BNMaxPool(nn.Module):
-    def __init__(self, num_classes: int):
-        super(LeNet5BNMaxPool, self).__init__()
-        ...
-
-    def forward(self, x):
-        ...
-
-
-cfg.model.name = LeNet5BNMaxPool
-```
-
-Finally, serialize the resulting configuration to a dictionary:
-
-```python
-cfg = cfg.toDict()
-```
-
-#### Option 2: a YAML file
-
-```python
-# TO DO!
-```
-
-#### Option 3: OmegaConf
-
-```python
-# TO DO!
-```
-
-#### Option 4: Hydra
-
-```python
-# TO DO!
-```
-
-### 2. Get the model, data and trainer
-
-#### Option 1: Let `autolightning` do the work (for example in notebooks or embedded in other scripts)
-
-Use `config_all` to configure the model, data and trainer in one go. This function returns the trainer, model and data objects, which can be used to train the model. Alternatively, you can also use `config_model`, `config_data` and `config_model_data` to only configure specific parts.
-
-```python
-from lightning.pytorch.loggers import WandbLogger
-
-from autolightning import config_all
-
-trainer, model, data = config_all(cfg,
-    # Specify all keyworded arguments that are not part of the 
-    # `cfg.training` dictionary for the PyTorch Lightning Trainer
-    {
-        "enable_progress_bar": True,
-        "accelerator": "mps",
-        "devices": 1,
-        "logger": WandbLogger(project="test_wandb_lightning")
-    }
+data = MNIST(
+    root="data",
+    dataloaders=dict(batch_size=128)
+    transforms=[transforms.ToTensor(), nn.Flatten(start_dim=0)]
 )
 ```
 
-#### Option 2: Create the objects manually
-
-By creating the objects manually, you will have more flexibility and can decide which objects are created with autolightning and which you create by yourself. For example, in this way, you can combine a custom model configured via autolightning with a regular PyTorch dataloader.
+Then train using the same PyTorch Lightning trainer that you were used too:
 
 ```python
-from autolightning.lm import SupervisedLearner
-from autolightning.datasets import MagicData
+from lightning.pytorch import Trainer
 
-from lightning import Trainer
+trainer = Trainer(
+    max_epochs=10
+)
 
-# Create the model, data and trainer
-model = SupervisedLearner(cfg)
-data = MagicData(cfg)
-trainer = Trainer(**cfg["training"])
+trainer.fit(model, data)
 ```
 
-#### Option 3: Use the AutoLightning CLI (based on PyTorch Lightning CLI)
+### From the CLI (based on PyTorch Lightning CLI)
 
-You can immediately continue with [step 3 - train the model](#3-train-the-model).
-
-Note thattThe `autolightning` CLI tool supports all the same arguments as the regular PyTorch Lightning CLI (as the `AutoCLI` is a subclass of the `LightningCLI`) but allows for two key differences:
+Note that the `autolightning` CLI tool supports all the same arguments as the regular PyTorch Lightning CLI (as the `AutoCLI` is a subclass of the `LightningCLI`) but allows for two key differences:
 
 1. Configurations can also be specified as Python files (instead of in YAML files)
 2. The AutoCLI has additional `torch` flags that can be set in a configuration file to configure the PyTorch backend regarding debugging and performance. For example:
@@ -383,20 +213,20 @@ python main.py fit --config ./config.yaml
 
 In case you want to add or override behavior of the defaults selected by autolightning, this can be done by using hooks. autolightning adds a few new hooks, next to the ones provided by PyTorch Lightning:
 
-- `configure_configuration(self, cfg: Dict)`
-    - Return the configuration that should be used. This configuration can be accessed at `self.hparams`.
-- `config_model(self)`
-    - Return the model that should be trained. This model can be access with `get_model(self)`.
-- `compile_model(self, model: nn.Module)`
-    - Compile the model and return it. This is called after the model is built and can be used to add change the compile behavior.
-- `configure_criteria(self)`
-    - Return the criteria that should be used.
-- `configure_optimizers_only(self)`
-    - Return the optimizers that should be used.
-- `configure_schedulers(self, optimizers: List[optim.Optimizer])`
-    - Return the schedulers that should be used.
-- `shared_step(self, batch, batch_idx, phase: str)` 
-    - Function that is called by `training_step(...)`, `validation_step(...)`,  `test_step(...)` and `predict_step(...)` from the`AutoModule` with the fitting stage argument (`train`/`val`/`test`/`predict`)
+- `parameters_for_optimizer(self, recurse: bool = True)`
+    - Return the parameters that should be used for the optimizer.
+- `register_optimizer(self, module: nn.Module, optimizer: Optional[OptimizerCallable] = None, lr_scheduler: Optional[LRSchedulerCallable] = None)`
+    - Register the optimizer and learning rate scheduler that should be used.
+- `register_metric(self, name: str, metric: MetricType)`
+    - Register a metric that should be used.
+- `register_metrics(self, metrics: Dict[str, MetricType])`
+    - Register multiple metrics that should be used.
+- `enable_prog_bar(self, phase: Phase)`
+    - Return whether the progress bar should be enabled.
+- `shared_step(self, phase: Phase, *args, **kwargs)`
+    - Function that is called by `shared_logged_step(...)` from the `AutoModule` with the fitting phase argument (`train`/`val`/`test`/`predict`)
+- `shared_logged_step(self, phase: Phase, *args: Any, **kwargs: Any):` 
+    - Function that is called by `training_step(...)`, `validation_step(...)`,  `test_step(...)` and `predict_step(...)` from the`AutoModule` with the fitting phase argument (`train`/`val`/`test`/`predict`)
 
 #### Example hook usage
 
@@ -406,22 +236,10 @@ import torch.nn as nn
 from autolightning import AutoModule
 
 class MyModel(AutoModule):
-    def config_model(self):
-        # Can put any logic here and can access the configuration
-        # via self.hparams
-        return nn.Linear(100, 10)
-
-    def configure_criteria(self):
-        return nn.MSELoss()
-
     def shared_step(self, batch, batch_idx, phase: str):
         X, y = batch
-        model = self.get_model()
-        criterion = self.criteria
 
-        loss = criterion(model(X), y)
-
-        self.log(f"{phase}/loss", loss)
+        loss = self.criterion(self.net(X), y)
 
         return loss
 ```
