@@ -250,17 +250,16 @@ class MyModel(AutoModule):
 
 Similar to models, you can customize the data loading behavior by using hooks. autolightning adds the following new hooks:
 
-- `configure_configuration(self, cfg: Dict)`
-- `get_common_transform(self, moment: str)`
-- `get_common_target_transform(self, moment: str)`
-- `get_common_batch_transform(self, moment: str)`
 - `get_transform(self, stage: str)`
+    - Return the transform that should be used for the given stage.
 - `get_target_transform(self, stage: str)`
-- `get_batch_transform(self, moment: str)`
-- `get_dataloader_kwargs(self, stage: str)`
-- `get_dataset(self, phase: str)`
-- `get_transformed_dataset(self, phase: str)`
-- `get_dataloader(self, phase: str)`
+    - Return the target transform that should be used for the given stage.
+- `get_dataset(self, phase: Phase)`
+    - Return the dataset that should be used for the given phase.
+- `get_transformed_dataset(self, phase: Phase)`
+    - Return the dataset that should be used for the given phase, after applying the transforms.
+- `get_dataloader(self, phase: Phase)`
+    - Return the dataloader that should be used for the given phase.
 
 #### Example hook usage
 
@@ -270,8 +269,8 @@ import torch.nn as nn
 from autolightning import AutoDataModule
 
 class MyDataModule(AutoDataModule):
-    def get_dataset(self, split: str):
+    def get_dataset(self, phase):
         # Can put any logic here and can access the configuration
         # via self.hparams
-        return MyDataset(split)
+        return MyDataset(train=phase == 'train')
 ```
