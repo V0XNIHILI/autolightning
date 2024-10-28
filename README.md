@@ -71,24 +71,87 @@ trainer.fit(model, data)
 Note that the `autolightning` CLI tool supports all the same arguments as the regular PyTorch Lightning CLI (as the `AutoCLI` is a subclass of the `LightningCLI`) but allows for two key differences:
 
 1. Configurations can also be specified as Python files (instead of in YAML files)
-2. The AutoCLI has additional `torch` flags that can be set in a configuration file to configure the PyTorch backend regarding debugging and performance. For example:
-    ```yaml
-    ...
-    torch:
-    autograd:
-        set_detect_anomaly: False
-        profiler:
-        profile: False
-        emit_nvtx: False
-    set_float32_matmul_precision: high
-    backends:
-        cuda:
-        matmul:
-            allow_tf32: True
-        cudnn:
+2. The AutoCLI has additional `torch` flags that can be set in a configuration file to configure the PyTorch backend regarding debugging and performance.
+3. By default, the CLI only allows subclasses of `AutoModule` and `AutoDataModule` to be used as Lightning modules.
+
+To train an MLP on MNIST, you can write a YAML configuration file like the following:
+
+```yaml
+# filename: config.yaml
+# --------------------
+
+model:
+  class_path: autolightning.lm.Classifier
+  init_args:
+    net:
+        class_path: torchvision.ops.MLP
+        init_args:
+            in_channels: 784
+            hidden_channels: [100, 10]
+data:
+  class_path: autolightning.datasets.MNIST
+  init_args:
+    root: data/
+    download: true
+    transforms:
+      post:
+        - class_path: torchvision.transforms.ToTensor
+        - class_path: torchvision.transforms.Normalize
+          init_args:
+            mean: [0.1307]
+            std: [0.3081]
+        - class_path: torch.nn.Flatten
+          init_args:
+            start_dim: 0
+    dataloaders:
+      defaults:
+        batch_size: 1024
+      train:
+        shuffle: true
+      val:
+        drop_last: false
+optimizer:
+  class_path: torch.optim.Adam
+  init_args:
+    lr: 1e-3
+seed_everything: 437952406
+trainer:
+  check_val_every_n_epoch: 10
+  max_epochs: 100
+  accelerator: cpu
+  logger:
+    - class_path: autolightning.loggers.AutoWandbLogger
+      init_args:
+        project: name_of_my_project
+```
+
+Then, to add the additional torch flags, you can append the following to the configuration file:
+
+```yaml
+...
+torch:
+autograd:
+    set_detect_anomaly: False
+    profiler:
+    profile: False
+    emit_nvtx: False
+set_float32_matmul_precision: high
+backends:
+    cuda:
+    matmul:
         allow_tf32: True
-        benchmark: True
-    ```
+    cudnn:
+    allow_tf32: True
+    benchmark: True
+```
+
+To run training on the configuration file, you can use the following command:
+
+```bash
+autolightning fit -c config.yaml
+```
+
+#### Best practice
 
 You can also split hyperparameter configuration from per-machine specific configuration by moving the latter into a separate (YAML) config file, for example:
 
@@ -118,91 +181,10 @@ trainer:
   devices: [3]
 ```
 
-To run training on the combined configuration (where only the values in `main.py` are stored as hyperparemeters):
+To run training on the combined configuration (where the values in `main.py` are hyperparameters and the values in `local.yaml` are machine-specific):
 
 ```bash
 autolightning fit -c main.py  -c local.yaml
-```
-
-#### Option 4: Use the original PyTorch Lightning CLI
-<details>
-    <summary>Option 4.2 (not recommended): Enable model, data and trainer configuration from CLI</summary>
-
-In this way, you store all the training, model and data configuration in one file. However, to stay consistent with the original Lightning CLI API, we use variable interpolation to avoid duplicate values in the YAML file (to enable this, we set `parser_kwargs={"parser_mode": "omegaconf"}`).
-
-```python
-# file: main.py
-
-from autolightning import ConfigurableLightningModule, ConfigurableLightningDataModule
-
-from lightning.pytorch.cli import LightningCLI
-
-def cli_main():
-    LightningCLI(
-        ConfigurableLightningModule,
-        ConfigurableLightningDataModule,
-        subclass_mode_model=True,
-        subclass_mode_data=True,
-        parser_kwargs={"parser_mode": "omegaconf"}
-    )
-
-if __name__ == "__main__":
-    cli_main()
-```
-
-```yaml
-# file: config.yaml
-
-trainer:
-  max_epochs: ${model.init_args.cfg.training.max_epochs}
-  ...
-model:
-  class_path: ${model.init_args.cfg.learner.name}
-  init_args:
-    # All variables in the this cfg variable below will be saved as hyperparameters,
-    # and can be accessed in the model via self.hparams. None of the other variables
-    # in this file will be saved as hyperparameters.
-    cfg:
-      criterion:
-      dataloaders:
-      dataset:
-        name: your_module.YourDataModule
-      learner:
-        name: autolightning.lm.SupervisedLearner
-      lr_scheduler:
-      model:
-      optimizer:
-      seed: 4223747124
-      training:
-        max_epochs: 100
-    ...
-data:
-  class_path: ${model.init_args.cfg.dataset.name}
-  init_args:
-    cfg: ${model.init_args.cfg}
-    ...
-seed_everything: ${model.init_args.cfg.seed}
-```
-</details>
-
-### 3. Train the model
-
-If you have the model, data and trainer instantiated, you can train the model using the following code:
-
-```python
-trainer.fit(model, data)
-```
-
-Or if you want to use the AutoLightning CLI, you can run the following command:
-
-```bash
-autolighting fit --config main.py --config local.yaml
-```
-
-Finally, in case you used the original PyTorch Lightning CLI in your own code, you can run the following command:
-
-```bash
-python main.py fit --config ./config.yaml
 ```
 
 ## Customization
