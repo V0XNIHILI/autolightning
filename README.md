@@ -1,4 +1,4 @@
-# autolightning
+# autolightning ⚡️
 
 **The authors of this project would like to thank the [Lightning](https://lightning.ai/) team for their amazing work on [PyTorch Lightning](https://github.com/Lightning-AI/pytorch-lightning), which this project is extensively based on.**
 
