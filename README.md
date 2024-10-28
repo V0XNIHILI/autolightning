@@ -128,21 +128,20 @@ trainer:
 Then, to add the additional torch flags, you can append the following to the configuration file:
 
 ```yaml
-...
 torch:
-autograd:
+  autograd:
     set_detect_anomaly: False
     profiler:
     profile: False
     emit_nvtx: False
-set_float32_matmul_precision: high
+  set_float32_matmul_precision: high
 backends:
-    cuda:
-    matmul:
-        allow_tf32: True
-    cudnn:
+  cuda:
+  matmul:
     allow_tf32: True
-    benchmark: True
+  cudnn:
+  allow_tf32: True
+  benchmark: True
 ```
 
 To run training on the configuration file, you can use the following command:
