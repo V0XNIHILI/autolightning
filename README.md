@@ -150,6 +150,46 @@ To run training on the configuration file, you can use the following command:
 autolightning fit -c config.yaml
 ```
 
+#### Extra options
+
+Alternatively, you can also load a pre-trained model from a state dict or compile a model before training it.
+
+##### Loading a pre-trained model
+
+```yaml
+model:
+  class_path: autolightning.lm.Classifier
+  init_args:
+    net:
+        class_path: autolightning.load
+        init_args:
+          module:
+            class_path: torchvision.ops.MLP
+            init_args:
+                in_channels: 784
+                hidden_channels: [100, 10]
+          file_path: path/to/state_dict.pth
+...
+```
+
+##### Compiling a model
+
+```yaml
+model:
+  class_path: autolightning.lm.Classifier
+  init_args:
+    net:
+        class_path: autolightning.compile
+        init_args:
+          module:
+            class_path: torchvision.ops.MLP
+            init_args:
+                in_channels: 784
+                hidden_channels: [100, 10]
+          compiler_path: torch.compile
+...
+```
+
 #### Best practice
 
 You can also split hyperparameter configuration from per-machine specific configuration by moving the latter into a separate (YAML) config file, for example:
