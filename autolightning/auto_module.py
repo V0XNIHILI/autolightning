@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Callable, Any, Iterator
+from typing import Dict, Optional, Any, Iterator
 import warnings
 
 import torch.nn as nn
@@ -72,6 +72,16 @@ class AutoModule(L.LightningModule):
 
         self.save_hyperparameters(ignore=KEYS_TO_IGNORE)
 
+    def parameters_for_optimizer(self, recurse: bool = True) -> Iterator[Parameter]:
+        params = self.parameters(recurse)
+
+        if self.exclude_no_grad:
+            for param in params:
+                if param.requires_grad:
+                    yield param
+        else:
+            yield from params
+
     def register_optimizer(self, module: nn.Module, optimizer: Optional[OptimizerCallable] = None, lr_scheduler: Optional[LRSchedulerCallable] = None):
         if optimizer != None:
             if module in self.optimizers_schedulers:
@@ -80,16 +90,6 @@ class AutoModule(L.LightningModule):
             self.optimizers_schedulers[module] = (optimizer, lr_scheduler)
         elif lr_scheduler != None:
             raise ValueError("Cannot register a scheduler when the optimizer is None")
-
-    def parameters_for_optimizer(self, *args, **kwargs) -> Iterator[Parameter]:
-        params = self.parameters(*args, **kwargs)
-
-        if self.exclude_no_grad:
-            for param in params:
-                if param.requires_grad:
-                    yield param
-        else:
-            return params
 
     def configure_optimizers(self) -> OptimizerLRScheduler:
         optimizers = []
@@ -111,7 +111,7 @@ class AutoModule(L.LightningModule):
                 optimizers.append(optimizer)
 
                 if scheduler != None:
-                    if isinstance(scheduler, optim.lr_scheduler._LRScheduler):
+                    if isinstance(scheduler, optim.lr_scheduler.LRScheduler):
                         schedulers.append(scheduler)
                     else:
                         schedulers.append(scheduler(optimizers[-1]))
@@ -178,6 +178,12 @@ class AutoModule(L.LightningModule):
        for name, metric in metrics.items():
            self.register_metric(name, metric)
 
+    def enable_prog_bar(self, phase: Phase):
+        if self.disable_prog_bar:
+            return False
+
+        return phase == 'val'
+
     def forward(self, *args: Any, **kwargs: Any) -> Any:
         """The forward step in an `AutoModule` ideally implements ONLY the forward pass through the network,
         returning the output of the network that can directly be fed into the criterion.
@@ -197,12 +203,6 @@ class AutoModule(L.LightningModule):
         """
 
         raise NotImplementedError
-
-    def enable_prog_bar(self, phase: Phase):
-        if self.disable_prog_bar:
-            return False
-
-        return phase == 'val'
 
     def shared_logged_step(self, phase: Phase, *args: Any, **kwargs: Any):
         # step_out can be:
