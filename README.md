@@ -1,6 +1,6 @@
 # autolightning ⚡️
 
-**The authors of this project would like to thank the [Lightning](https://lightning.ai/) team for their amazing work on [PyTorch Lightning](https://github.com/Lightning-AI/pytorch-lightning), which this project is extensively based on.**
+**The authors of this project would like to thank the [Lightning](https://lightning.ai/) team for their amazing work on [PyTorch Lightning](https://github.com/Lightning-AI/pytorch-lightning), which this project is fully based on.**
 
 The goal of this project is to achieve zero-code, from-configuration-only training of PyTorch models using PyTorch Lightning. This is achieved by using a configuration dictionary that specifies the model, the dataset, the data loaders, etc. The configuration is then used to build all required objects. Currently, this leads to an average lines-of-code reduction of 15% compared to a standard PyTorch Lightning, while improving customizability + reproducibility and maintaining the same flexibility as the original code.
 
@@ -295,3 +295,7 @@ class MyDataModule(AutoDataModule):
         # via self.hparams
         return MyDataset(train=phase == 'train')
 ```
+
+---
+
+© (2024) Douwe den Blanken, Delft, the Netherlands
