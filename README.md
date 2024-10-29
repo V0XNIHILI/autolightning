@@ -4,6 +4,34 @@
 
 The goal of this project is to achieve zero-code, from-configuration-only training of PyTorch models using PyTorch Lightning. This is achieved by using a configuration dictionary that specifies the model, the dataset, the data loaders, etc. The configuration is then used to build all required objects. Currently, this leads to an average lines-of-code reduction of 15% compared to a standard PyTorch Lightning, while improving customizability + reproducibility and maintaining the same flexibility as the original code.
 
+## Built-in training methods
+
+### Supervised learning
+
+* Regular supervised learning ([`Supervised`](./autolightning/lm/supervised.py))
+* Classification ([`Classifier`](./autolightning/lm/classifier.py))
+
+### Self-supervised learning
+
+* Siamese networks ([`Siamese`](./autolightning/lm/self_supervised.py))
+* Triplet networks ([`Triplet`](./autolightning/lm/self_supervised.py))
+
+### Knowledge distillation
+
+* Knowledge distillation supporting an optional student head and a student regressor net ([`Distilled`](./autolightning/lm/distillation.py)), useful distillation losses provided in [`distillation_losses.py`](autolightning/nn/distillation_losses.py)
+
+### Quantization-aware training (QAT)
+
+* Performing QAT with [Brevitas](https://github.com/Xilinx/brevitas) ([`BrevitasSupervised`, `BrevitasClassifier`, `BrevitasPrototypical`](./autolightning/lm/qat.py))
+
+### Few-shot learning
+
+* Prototypical learning ([`Prototypical`](./autolightning/lm/prototypical.py))
+
+### Continual learning
+
+Works in progress!
+
 ## Installation
 
 To install the package, you can use the following command:
