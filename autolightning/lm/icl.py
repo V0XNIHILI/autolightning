@@ -9,9 +9,9 @@ from autolightning.types import Phase, AutoModuleKwargs, Unpack
 
 
 def icl_forward(head_or_net: nn.Module, X_train, y_train, X_test, sample_embedder: Optional[nn.Module] = None, merge_data_strategy: str = "flatten", combine_batch_and_samples: bool = False):
-    if sample_embedder is not None:
-        batch = X_train.size(0)
+    batch = X_train.size(0)
 
+    if sample_embedder is not None:
         if combine_batch_and_samples:
             # Combine first and second dimension
             X_train = X_train.view(-1, *X_train.size()[2:]) # (batch * n_train_samples, ...)
