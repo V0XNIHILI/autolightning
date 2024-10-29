@@ -55,3 +55,10 @@ def compile(module: nn.Module, compiler_path: str, compiler_kwargs: Optional[Dic
     function = _import_module(compiler_path)
 
     return function(module, **(compiler_kwargs if compiler_kwargs != None else {}))
+
+
+def disable_grad(module: nn.Module) -> nn.Module:
+    for param in module.parameters():
+        param.requires_grad = False
+
+    return module

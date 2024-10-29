@@ -10,7 +10,7 @@ from autolightning.types import Phase, AutoModuleKwargs, Unpack
 
 def icl_forward(head_or_net: nn.Module, X_train, y_train, X_test, sample_embedder: Optional[nn.Module] = None, merge_data_strategy: str = "flatten", combine_batch_and_samples: bool = False):
     batch = X_train.size(0)
-
+    
     if sample_embedder is not None:
         if combine_batch_and_samples:
             # Combine first and second dimension
@@ -77,7 +77,7 @@ class ICLClassifierKwargs(ICLKwargs, AutoModuleKwargs):
 
 
 class ICLClassifier(ClassifierMixin, ICL):
-    def __init__(self, label_embedder: Optional[nn.Embedding] = None, **kwargs: Unpack[ICLClassifierKwargs]):
+    def __init__(self, label_embedder: Optional[nn.Module] = None, **kwargs: Unpack[ICLClassifierKwargs]):
         super().__init__(**kwargs)
     
         self.label_embedder = label_embedder

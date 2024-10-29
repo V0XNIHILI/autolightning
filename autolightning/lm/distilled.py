@@ -5,6 +5,7 @@ import torch.nn as nn
 
 from .. import AutoModule
 from ..types import AutoModuleKwargsNoNet, Unpack
+from ..utils import disable_grad
 
 
 def distilled_forward(student: nn.Module, student_head : Optional[nn.Module] = None, student_regressor : Optional[nn.Module]= None, *args, **kwargs):
@@ -44,8 +45,7 @@ class DistilledMixin:
         self.teacher = teacher_net
         self.student_head = student_head_net
 
-        for param in self.teacher.parameters():
-            param.requires_grad = False
+        disable_grad(self.teacher)
 
 
 class Distilled(DistilledMixin, AutoModule):
