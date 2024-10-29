@@ -25,15 +25,15 @@ def icl_forward(head_or_net: nn.Module, X_train, y_train, X_test, sample_embedde
             X_test = X_test.view(batch, -1, *X_test.size()[1:]) # (batch, n_test_samples, ...)
 
     if merge_data_strategy == "flatten":
-        X_train_test = torch.cat([X_train, X_test], dim=1).view(X_train.size(0), -1)
+        X_train_test = torch.cat([X_train, X_test], dim=1).view(batch, -1) # (batch, (n_train_samples + n_test_samples) * total_n_features)
 
         # Flatten y_train separately to make sure that different embedding
         # size between y and X are handled correctly
-        y_train = y_train.view(y_train.size(0), -1)
+        y_train = y_train.view(batch, -1) # (batch, n_train_samples * n_label_features)
 
-        X = torch.cat([X_train_test, y_train], dim=1)
+        X = torch.cat([X_train_test, y_train], dim=1) # (batch, (n_train_samples + n_test_samples) * total_n_features + n_train_samples * n_label_features)
     elif merge_data_strategy == "transpose":
-        X = torch.cat([X_train, y_train, X_test], dim=1) # (batch, 2 * n_train_samples + n_test_samples, n_features)
+        X = torch.cat([X_train, y_train, X_test], dim=1) # (batch, 2 * n_train_samples + n_test_samples, total_n_features)
         X = X.transpose(1, 2)
     else:
         raise ValueError(f"Unknown strategy: {merge_data_strategy}")
