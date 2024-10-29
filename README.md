@@ -32,6 +32,14 @@ The goal of this project is to achieve zero-code, from-configuration-only traini
 
 Works in progress!
 
+## Built-in datasets
+
+* Any dataset that has the call signature `(root: str, download: bool, train: bool)` using [`RootDownloadTrain`](./autolightning/datasets.py), a few of these are included by default:
+  * [`MNIST`](./autolightning/datasets.py)
+  * [`CIFAR10`](./autolightning/datasets.py)
+  * [`FashionMNIST`](./autolightning/datasets.py)
+* Few-shot dataset using [`FewShotMixin`](./autolightning/dm/few_shot.py)
+
 ## Installation
 
 To install the package, you can use the following command:
