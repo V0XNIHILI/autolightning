@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Union, Callable, Any, Literal, Iterable, TypedDict
+from typing import Dict, Optional, Union, Callable, Any, Literal, Iterable, TypedDict, List
 
 try:
     from typing import Unpack  # Python 3.11+
@@ -16,6 +16,8 @@ MetricType = Dict[str, Union[Metric, Callable[..., Any]]]
 OptimizerType = Union[Optimizer, OptimizerCallable, Iterable[Union[Optimizer, OptimizerCallable]], Dict[str, OptimizerCallable]]
 LrSchedulerType = Union[LRSchedulerCallable, ]
 IterableOfModules = Iterable[nn.Module]
+
+TransformValue = Union[List[Callable], Callable]
 
 Phase = Literal["train", "val", "test"]
 

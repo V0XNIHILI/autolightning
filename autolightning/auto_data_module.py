@@ -10,7 +10,7 @@ from jsonargparse import Namespace
 
 from pytorch_lightning.cli import instantiate_class
 
-from .types import Phase
+from .types import Phase, TransformValue
 
 from torch_mate.data.utils import Transformed, PreLoaded
 
@@ -19,7 +19,6 @@ ALLOWED_DATASET_KEYS = STAGES + ["defaults"]
 PRE_LOAD_MOMENT = "pre_load"
 ARGS_KEY = "args"
 
-TransformValue = Union[List[Callable], Callable]
 TransformType = Union[Dict[str, TransformValue], TransformValue]
 
 
@@ -114,7 +113,7 @@ def build_transform(stage: str, transforms: TransformType) -> (Callable | None):
 class AutoDataModule(L.LightningDataModule):
 
     def __init__(self,
-                 dataset: Optional[Union[Dict[str, Dataset], Dict, Dataset]] = None,
+                 dataset: Optional[Union[Dict[str, Dataset], Dataset]] = None,
                  dataloaders: Optional[Dict] = None,
                  transforms: Optional[TransformType] = None,
                  target_transforms: Optional[TransformType] = None,
@@ -256,9 +255,7 @@ class AutoDataModule(L.LightningDataModule):
         
         return Transformed(dataset, transform, target_transform)
     
-    def get_dataloader(self, phase: Phase):
-        dataset = self.get_transformed_dataset(phase)
-
+    def get_dataloader(self, phase: Phase, dataset: Dataset):
         # If the dataloader configuration is specified per phase...
         if any(key in self.dataloaders for key in ALLOWED_DATASET_KEYS):
             assert set(self.dataloaders.keys()) - set(ALLOWED_DATASET_KEYS) == set(), f"Unsupported keys in dataloader configuration: {set(self.dataloaders.keys()) - set(ALLOWED_DATASET_KEYS)}; only {ALLOWED_DATASET_KEYS} are allowed"
@@ -270,16 +267,16 @@ class AutoDataModule(L.LightningDataModule):
         return DataLoader(dataset, **kwargs)
 
     def train_dataloader(self):
-        return self.get_dataloader('train')
+        return self.get_dataloader('train', self.get_transformed_dataset('train'))
     
     def val_dataloader(self):
-        return self.get_dataloader('val')
+        return self.get_dataloader('val', self.get_transformed_dataset('val'))
     
     def test_dataloader(self):
-        return self.get_dataloader('test')
+        return self.get_dataloader('test', self.get_transformed_dataset('test'))
     
     def predict_dataloader(self):
-        return self.get_dataloader('predict')
+        return self.get_dataloader('predict', self.get_transformed_dataset('predict'))
     
     def on_before_batch_transfer(self, batch, dataloader_idx: int):
         tf = self.batch_transforms.get("pre", None)
