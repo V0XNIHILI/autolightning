@@ -180,7 +180,7 @@ autolightning fit -c config.yaml
 
 #### Extra options
 
-Alternatively, you can also load a pre-trained model from a state dict or compile a model before training it.
+Alternatively, you can also load a pre-trained model from a state dict, compile a model or disable gradients for a module:
 
 ##### Loading a pre-trained model
 
@@ -215,6 +215,23 @@ model:
                 in_channels: 784
                 hidden_channels: [100, 10]
           compiler_path: torch.compile
+...
+```
+
+##### Disabling gradients
+
+```yaml
+model:
+  class_path: autolightning.lm.Classifier
+  init_args:
+    net:
+        class_path: autolightning.disable_grad
+        init_args:
+          module:
+            class_path: torchvision.ops.MLP
+            init_args:
+                in_channels: 784
+                hidden_channels: [100, 10]
 ...
 ```
 
