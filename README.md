@@ -38,7 +38,7 @@ Works in progress!
   * [`MNIST`](./autolightning/datasets.py)
   * [`CIFAR10`](./autolightning/datasets.py)
   * [`FashionMNIST`](./autolightning/datasets.py)
-* Few-shot dataset using [`FewShotMixin`](./autolightning/dm/few_shot.py)
+* Few-shot dataset using [`FewShot` and `FewShotMixin`](./autolightning/dm/few_shot.py)
 
 ## Installation
 

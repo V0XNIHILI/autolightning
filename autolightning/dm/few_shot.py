@@ -1,5 +1,6 @@
-from torch_mate.data.utils import FewShot
+from torch_mate.data.utils import FewShot as FS
 
+from .. import AutoDataModule
 from ..types import Unpack, AutoDataModuleKwargs
 
 
@@ -28,4 +29,8 @@ class FewShotMixin:
             if self.train_query_shots != -1:
                 query_shots = self.train_query_shots
 
-        return FewShot(dataset, n_way=ways, k_shot=self.shots, query_shots=query_shots, query_ways=self.query_ways, keep_original_labels=self.keep_original_labels)
+        return FS(dataset, n_way=ways, k_shot=self.shots, query_shots=query_shots, query_ways=self.query_ways, keep_original_labels=self.keep_original_labels)
+
+
+class FewShot(FewShotMixin, AutoDataModule):
+    pass
