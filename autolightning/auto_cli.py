@@ -3,7 +3,7 @@ import os
 import tempfile
 import yaml
 import importlib
-from typing import Dict, Any, Union, List, Tuple
+from typing import Dict, Any, Union, List, Tuple, Optional
 
 from jsonargparse import ActionConfigFile
 
@@ -14,6 +14,20 @@ from lightning.pytorch.loggers import Logger
 from lightning.pytorch.trainer import Trainer
 
 from torch_mate.utils import disable_torch_debug_apis, configure_cuda
+
+
+def cc(class_path: str, init_args: Optional[dict] = None, **kwargs: Any):
+    out = {"class_path": class_path}
+
+    if init_args is not None:
+        if kwargs:
+            raise ValueError("Cannot provide both init_args and kwargs")
+
+        out["init_args"] = init_args
+    elif kwargs != {}:
+        out["init_args"] = kwargs
+
+    return out
 
 
 def write_to_temp_file(content):
