@@ -46,6 +46,9 @@ def icl_shared_step(module: nn.Module, batch):
 
     output = module(X_train, y_train, X_test)
 
+    # y_test is of shape (batch, 1) here, but we need it to be of shape (batch,)
+    y_test = y_test.flatten()
+
     return (output, y_test)
 
 
