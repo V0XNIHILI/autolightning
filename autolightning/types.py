@@ -17,7 +17,8 @@ OptimizerType = Union[Optimizer, OptimizerCallable, Iterable[Union[Optimizer, Op
 LrSchedulerType = Union[LRSchedulerCallable, ]
 IterableOfModules = Iterable[nn.Module]
 
-TransformValue = Union[List[Callable], Callable]
+CallableOrModule = Union[Callable, nn.Module]
+TransformValue = Union[List[CallableOrModule], CallableOrModule]
 
 Phase = Literal["train", "val", "test"]
 
