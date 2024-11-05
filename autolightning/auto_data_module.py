@@ -1,9 +1,9 @@
-from typing import Dict, Optional, Union, List, Callable
+from typing import Dict, Optional, Union, Callable
 
 import lightning as L
 
 import torch
-from torch.utils.data import DataLoader, Dataset, random_split as torch_random_split
+from torch.utils.data import DataLoader, Dataset, IterableDataset, random_split as torch_random_split
 from torchvision.transforms import Compose
 
 from jsonargparse import Namespace
@@ -12,18 +12,19 @@ from pytorch_lightning.cli import instantiate_class
 
 from .types import Phase, TransformValue
 
-from torch_mate.data.utils import Transformed, PreLoaded
+from torch_mate.data.utils import Transformed, TransformedIterable, PreLoaded
 
 STAGES = ["train", "val", "test", "predict"]
 ALLOWED_DATASET_KEYS = STAGES + ["defaults"]
 PRE_LOAD_MOMENT = "pre_load"
 ARGS_KEY = "args"
 
+AllDatasetsType = Union[Dataset, IterableDataset]
 TransformType = Union[Dict[str, TransformValue], TransformValue]
 
 
 def instantiate_datasets(dataset: Optional[Union[Dict[str, Dataset], Dict, Dataset]]) -> (Dataset | Dict[str, Dataset] | None):
-    if dataset is None or isinstance(dataset, Dataset):
+    if dataset is None or isinstance(dataset, Dataset) or isinstance(dataset, IterableDataset):
         return dataset
 
     if not isinstance(dataset, dict):
@@ -113,7 +114,7 @@ def build_transform(stage: str, transforms: TransformType) -> (Callable | None):
 class AutoDataModule(L.LightningDataModule):
 
     def __init__(self,
-                 dataset: Optional[Union[Dict[str, Dataset], Dataset]] = None,
+                 dataset: Optional[Union[Dict[str, AllDatasetsType], AllDatasetsType]] = None,
                  dataloaders: Optional[Dict] = None,
                  transforms: Optional[TransformType] = None,
                  target_transforms: Optional[TransformType] = None,
@@ -253,7 +254,11 @@ class AutoDataModule(L.LightningDataModule):
         if transform is None and target_transform is None:
             return dataset
         
-        return Transformed(dataset, transform, target_transform)
+        # check if dataset has len attribute
+        if not hasattr(dataset, '__len__'):
+            return TransformedIterable(dataset, transform, target_transform)
+        else:
+            Transformed(dataset, transform, target_transform)
     
     def get_dataloader(self, phase: Phase, dataset: Dataset):
         # If the dataloader configuration is specified per phase...
