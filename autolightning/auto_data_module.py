@@ -258,7 +258,7 @@ class AutoDataModule(L.LightningDataModule):
         if not hasattr(dataset, '__len__'):
             return TransformedIterable(dataset, transform, target_transform)
         else:
-            Transformed(dataset, transform, target_transform)
+            return Transformed(dataset, transform, target_transform)
     
     def get_dataloader(self, phase: Phase, dataset: Dataset):
         # If the dataloader configuration is specified per phase...
