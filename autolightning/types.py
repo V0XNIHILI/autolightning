@@ -57,6 +57,16 @@ class AutoModuleKwargsNoNet(TypedDict, total=False):
     disable_prog_bar: bool
 
 
+class AutoModuleKwargsNoNetCriterion(TypedDict, total=False):
+    optimizer: Optional[OptimizerType]
+    lr_scheduler: Optional[LrSchedulerType]
+    metrics: Optional[MetricType]
+    loss_log_key: Optional[str]
+    log_metrics: bool
+    exclude_no_grad: bool
+    disable_prog_bar: bool
+
+
 class AutoDataModuleKwargs(TypedDict, total=False):
     dataset: Optional[Union[Dict[str, Any], Dict, Any]]
     dataloaders: Optional[Dict]
