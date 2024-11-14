@@ -14,6 +14,7 @@ from .types import Phase, TransformValue
 
 from torch_mate.data.utils import Transformed, TransformedIterable, PreLoaded
 
+
 STAGES = ["train", "val", "test", "predict"]
 ALLOWED_DATASET_KEYS = STAGES + ["defaults"]
 PRE_LOAD_MOMENT = "pre_load"

@@ -1,9 +1,12 @@
 from typing import Any, Optional, Dict
 from collections import OrderedDict
+from functools import partial
 import importlib
 
 import torch
 import torch.nn as nn
+
+from lightning.pytorch.cli import OptimizerCallable, LRSchedulerCallable
 
 
 LIGHTNING_STATE_DICT_KEYS = [
@@ -73,3 +76,15 @@ def remove_n_layers(module: nn.Module, n: int = -1) -> nn.Module:
         selected_layers = selected_layers[n:]
 
     return nn.Sequential(*selected_layers)
+
+
+def optim(class_name: str, **kwargs: Dict[str, Any]) -> OptimizerCallable:
+    optimizer_class = _import_module(class_name)
+
+    return partial(optimizer_class, **kwargs)
+
+
+def sched(class_name: str, **kwargs: Dict[str, Any]) -> LRSchedulerCallable:
+    scheduler_class = _import_module(class_name)
+
+    return partial(scheduler_class, **kwargs)
