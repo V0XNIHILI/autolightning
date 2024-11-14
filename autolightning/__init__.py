@@ -1,7 +1,7 @@
 from .auto_module import AutoModule
 from .auto_data_module import AutoDataModule
 from .auto_cli import AutoCLI, cc
-from .utils import load, compile, disable_grad
+from .utils import load, compile, disable_grad, optim, sched
 
 __all__ = [
     "AutoModule",
@@ -10,5 +10,7 @@ __all__ = [
     "cc",
     "load",
     "compile",
-    "disable_grad"
+    "disable_grad",
+    "optim",
+    "sched"
 ]
