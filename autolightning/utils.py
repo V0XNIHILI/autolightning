@@ -84,13 +84,13 @@ def remove_n_layers(module: nn.Module, n: int = -1) -> nn.Module:
     return nn.Sequential(*selected_layers)
 
 
-def optim(optimizer_path: str, **kwargs: Dict[str, Any]) -> OptimizerCallable:
+def optim(optimizer_path: str, **kwargs: Any) -> OptimizerCallable:
     optimizer_class = _import_module(optimizer_path, default_module="torch.optim")
 
     return partial(optimizer_class, **kwargs)
 
 
-def sched(lr_scheduler_path: str, **kwargs: Dict[str, Any]) -> LRSchedulerCallable:
+def sched(lr_scheduler_path: str, **kwargs: Any) -> LRSchedulerCallable:
     scheduler_class = _import_module(lr_scheduler_path, default_module="torch.optim.lr_scheduler")
 
     return partial(scheduler_class, **kwargs)
