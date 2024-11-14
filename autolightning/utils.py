@@ -62,3 +62,14 @@ def disable_grad(module: nn.Module) -> nn.Module:
         param.requires_grad = False
 
     return module
+
+
+def remove_n_layers(module: nn.Module, n: int = -1) -> nn.Module:
+    selected_layers = list(module.children())
+
+    if n < 0:
+        selected_layers = selected_layers[:-n]
+    else:
+        selected_layers = selected_layers[n:]
+
+    return nn.Sequential(*selected_layers)
