@@ -47,29 +47,19 @@ def instantiate_datasets(dataset: Optional[Union[Dict[str, Dataset], Dict, Datas
         if isinstance(init["class_path"], Namespace):
             init["class_path"] = dict(init["class_path"])["class_path"]
 
+        # If any of the keys "train", "val", "test" or "predict" are present and they are all dictionaries, we build the datasets separately
         if ARGS_KEY in dataset and any(key in ALLOWED_DATASET_KEYS for key in dataset[ARGS_KEY].keys()) and all(isinstance(phase_val, dict) for phase_val in dataset[ARGS_KEY].values()):
-            # If any of the keys "train", "val", "test" or "predict" are present and they are all dictionaries, we build the datasets separately
-
             # Make sure no other keys are present except for the stages
             assert set(dataset[ARGS_KEY].keys()) - set(ALLOWED_DATASET_KEYS) == set(), f"Unsupported keys in dataset configuration: {set(dataset['args'].keys()) - set(ALLOWED_DATASET_KEYS)}"
 
             defaults = dataset[ARGS_KEY].get("defaults", {})
 
-            # only stage keys, then number of stages
-            # stage keys and defaults, then number of stages + 1, except for when all stages are present
-            keys_to_init = []
-
-            if "defaults" in dataset[ARGS_KEY]:
-                if len(dataset[ARGS_KEY]) == len(STAGES) + 1:
-                    keys_to_init = STAGES
-                else:
-                    keys_to_init = dataset[ARGS_KEY]
-            else:
-                keys_to_init = dataset[ARGS_KEY]
-
             dataset_dict = {}
             
-            for key in keys_to_init:
+            for key in dataset[ARGS_KEY].keys():
+                if key == "defaults":
+                    continue
+
                 init["init_args"] = dict(defaults) | (dataset[ARGS_KEY].get(key, {}))
 
                 if type(init["class_path"]) is str:
