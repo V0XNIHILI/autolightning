@@ -23,8 +23,14 @@ LIGHTNING_STATE_DICT_KEYS = [
 ]
 
 
-def _import_module(module_path: str) -> Any:
-    module_name, function_name = module_path.rsplit(".")
+def _import_module(module_path: str, default_module: Optional[str] = None) -> Any:
+    split = module_path.rsplit(".")
+
+    if len(split) == 1:
+        module_name = default_module
+        function_name = split[0]
+    else:
+        module_name, function_name = split
 
     function_module = importlib.import_module(module_name)
     function = getattr(function_module, function_name)
@@ -79,12 +85,12 @@ def remove_n_layers(module: nn.Module, n: int = -1) -> nn.Module:
 
 
 def optim(class_name: str, **kwargs: Dict[str, Any]) -> OptimizerCallable:
-    optimizer_class = _import_module(class_name)
+    optimizer_class = _import_module(class_name, default_module="torch.optim")
 
     return partial(optimizer_class, **kwargs)
 
 
 def sched(class_name: str, **kwargs: Dict[str, Any]) -> LRSchedulerCallable:
-    scheduler_class = _import_module(class_name)
+    scheduler_class = _import_module(class_name, default_module="torch.optim.lr_scheduler")
 
     return partial(scheduler_class, **kwargs)
