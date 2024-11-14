@@ -233,7 +233,7 @@ class AutoModule(L.LightningModule):
             loss = step_out
 
         prog_bar = self.enable_prog_bar(phase)
-        main_log_kwargs = dict(prog_bar = prog_bar).update(log_kwargs)
+        main_log_kwargs = dict(prog_bar = prog_bar) | log_kwargs
 
         if self.loss_log_key != None and loss != None:
             self.log_dict({
