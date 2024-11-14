@@ -215,28 +215,31 @@ class AutoModule(L.LightningModule):
 
         loss = None
         metric_inputs = {}
+        log_kwargs = {}
+        log_dict = {}
 
         if isinstance(step_out, (tuple, list)):
             loss = self.criterion(*step_out)
             metric_inputs = step_out
         elif isinstance(step_out, dict):
-            loss = step_out["loss"]
-
-            if isinstance(loss, (tuple, list)):
-                loss = self.criterion(*loss)
-
-            if "metrics" in step_out:
-                metric_inputs = step_out["metrics"]
-                assert len(step_out) == 2
-            else:
-                assert len(step_out) == 1
+            if "loss" in step_out:
+                loss = step_out["loss"]
+            elif "criterion_args" in step_out:
+                loss = self.criterion(*step_out["criterion_args"])
+    
+            log_kwargs = step_out.get("log_kwargs", {})
+            log_dict = step_out.get("log_dict", {})
         else:
             loss = step_out
 
         prog_bar = self.enable_prog_bar(phase)
+        main_log_kwargs = dict(prog_bar = prog_bar).update(log_kwargs)
 
         if self.loss_log_key != None and loss != None:
-            self.log(f"{phase}/{self.loss_log_key}", loss, prog_bar=prog_bar)
+            self.log_dict({
+                f"{phase}/{self.loss_log_key}": loss,
+                **{f"{phase}/{key}": value for key, value in log_dict.items()}
+            }, **main_log_kwargs)
 
         if isinstance(metric_inputs, dict):
             for name, inputs in metric_inputs.items():
