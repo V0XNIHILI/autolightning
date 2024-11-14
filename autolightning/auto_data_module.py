@@ -1,9 +1,9 @@
-from typing import Dict, Optional, Union, List, Callable
+from typing import Dict, Optional, Union, Callable, Literal
 
 import lightning as L
 
 import torch
-from torch.utils.data import DataLoader, Dataset, random_split as torch_random_split
+from torch.utils.data import DataLoader, Dataset, IterableDataset, random_split as torch_random_split
 from torchvision.transforms import Compose
 
 from jsonargparse import Namespace
@@ -12,18 +12,19 @@ from pytorch_lightning.cli import instantiate_class
 
 from .types import Phase, TransformValue
 
-from torch_mate.data.utils import Transformed, PreLoaded
+from torch_mate.data.utils import Transformed, TransformedIterable, PreLoaded
 
 STAGES = ["train", "val", "test", "predict"]
 ALLOWED_DATASET_KEYS = STAGES + ["defaults"]
 PRE_LOAD_MOMENT = "pre_load"
 ARGS_KEY = "args"
 
+AllDatasetsType = Union[Dataset, IterableDataset]
 TransformType = Union[Dict[str, TransformValue], TransformValue]
 
 
 def instantiate_datasets(dataset: Optional[Union[Dict[str, Dataset], Dict, Dataset]]) -> (Dataset | Dict[str, Dataset] | None):
-    if dataset is None or isinstance(dataset, Dataset):
+    if dataset is None or isinstance(dataset, Dataset) or isinstance(dataset, IterableDataset):
         return dataset
 
     if not isinstance(dataset, dict):
@@ -110,14 +111,39 @@ def build_transform(stage: str, transforms: TransformType) -> (Callable | None):
     return compose_if_list(tfs)
 
 
+def apply_batch_transforms(batch, key: str, transforms: dict, target_batch_transforms: dict):
+    tf = transforms.get(key, None)
+    id = lambda x: x
+
+    if tf is not None:
+        if target_batch_transforms == "combine":
+            return tf(batch)
+        
+        tft = target_batch_transforms.get(key, None) or id
+
+        x, y = batch
+
+        return tf(x), tft(y)
+
+    if target_batch_transforms == "combine":
+        raise ValueError("Target batch transform is set to 'combine' but batch transform is not set")
+    
+    tft = target_batch_transforms.get(key, None) or id
+
+    x, y = batch
+
+    return x, tft(y)
+
+
 class AutoDataModule(L.LightningDataModule):
 
     def __init__(self,
-                 dataset: Optional[Union[Dict[str, Dataset], Dataset]] = None,
+                 dataset: Optional[Union[Dict[str, AllDatasetsType], AllDatasetsType]] = None,
                  dataloaders: Optional[Dict] = None,
                  transforms: Optional[TransformType] = None,
                  target_transforms: Optional[TransformType] = None,
                  batch_transforms: Optional[TransformType] = None,
+                 target_batch_transforms: Optional[Union[TransformType, Literal["combine"]]] = "combine",
                  requires_prepare: bool = True,
                  pre_load: Union[Dict[str, bool], bool] = False,
                  random_split: Optional[Dict[str, Union[Union[int, float], Union[str, Dict[str, Union[int, float]]]]]] = None):
@@ -145,6 +171,7 @@ class AutoDataModule(L.LightningDataModule):
         self.transforms = {} if transforms is None else transforms
         self.target_transforms = {} if target_transforms is None else target_transforms
         self.batch_transforms = {} if batch_transforms is None else batch_transforms
+        self.target_batch_transforms = {} if target_batch_transforms is None else target_batch_transforms
 
         self.requires_prepare = requires_prepare
         self.pre_load = pre_load
@@ -253,9 +280,13 @@ class AutoDataModule(L.LightningDataModule):
         if transform is None and target_transform is None:
             return dataset
         
-        return Transformed(dataset, transform, target_transform)
-    
-    def get_dataloader(self, phase: Phase, dataset: Dataset):
+        # check if dataset has len attribute
+        if not hasattr(dataset, '__len__'):
+            return TransformedIterable(dataset, transform, target_transform)
+        else:
+            return Transformed(dataset, transform, target_transform)
+        
+    def get_dataloader_kwargs(self, phase: Phase):
         # If the dataloader configuration is specified per phase...
         if any(key in self.dataloaders for key in ALLOWED_DATASET_KEYS):
             assert set(self.dataloaders.keys()) - set(ALLOWED_DATASET_KEYS) == set(), f"Unsupported keys in dataloader configuration: {set(self.dataloaders.keys()) - set(ALLOWED_DATASET_KEYS)}; only {ALLOWED_DATASET_KEYS} are allowed"
@@ -264,6 +295,10 @@ class AutoDataModule(L.LightningDataModule):
         else:
             kwargs = self.dataloaders
 
+        return kwargs
+    
+    def get_dataloader(self, phase: Phase, dataset: Dataset):
+        kwargs = self.get_dataloader_kwargs(phase)
         return DataLoader(dataset, **kwargs)
 
     def train_dataloader(self):
@@ -279,17 +314,15 @@ class AutoDataModule(L.LightningDataModule):
         return self.get_dataloader('predict', self.get_transformed_dataset('predict'))
     
     def on_before_batch_transfer(self, batch, dataloader_idx: int):
-        tf = self.batch_transforms.get("pre", None)
-
-        if tf is not None:
-            return tf(batch)
-        
-        return batch
+        return apply_batch_transforms(
+            batch, "before",
+            self.batch_transforms,
+            self.target_batch_transforms
+        )
     
     def on_after_batch_transfer(self, batch, dataloader_idx: int):
-        tf = self.batch_transforms.get("post", None)
-
-        if tf is not None:
-            return tf(batch)
-        
-        return batch
+        return apply_batch_transforms(
+            batch, "after",
+            self.batch_transforms,
+            self.target_batch_transforms
+        )

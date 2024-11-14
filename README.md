@@ -76,7 +76,7 @@ import torch.nn as nn
 
 from torchvision import transforms
 
-net = nn.Linear(28*28, 7)
+net = nn.Linear(28*28, 10)
 
 model = Classifier(
     net=net, 

@@ -17,7 +17,8 @@ OptimizerType = Union[Optimizer, OptimizerCallable, Iterable[Union[Optimizer, Op
 LrSchedulerType = Union[LRSchedulerCallable, ]
 IterableOfModules = Iterable[nn.Module]
 
-TransformValue = Union[List[Callable], Callable]
+CallableOrModule = Union[Callable, nn.Module]
+TransformValue = Union[List[CallableOrModule], CallableOrModule]
 
 Phase = Literal["train", "val", "test"]
 
@@ -47,6 +48,16 @@ class AutoModuleKwargsNoCriterion(TypedDict, total=False):
 
 class AutoModuleKwargsNoNet(TypedDict, total=False):
     criterion: Optional[nn.Module]
+    optimizer: Optional[OptimizerType]
+    lr_scheduler: Optional[LrSchedulerType]
+    metrics: Optional[MetricType]
+    loss_log_key: Optional[str]
+    log_metrics: bool
+    exclude_no_grad: bool
+    disable_prog_bar: bool
+
+
+class AutoModuleKwargsNoNetCriterion(TypedDict, total=False):
     optimizer: Optional[OptimizerType]
     lr_scheduler: Optional[LrSchedulerType]
     metrics: Optional[MetricType]

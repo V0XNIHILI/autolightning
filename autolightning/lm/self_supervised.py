@@ -1,10 +1,10 @@
-from typing import Optional
-
 import torch
 import torch.nn as nn
+import torchvision
 
 from autolightning import AutoModule
-from autolightning.types import Phase, AutoModuleKwargsNoCriterion, Unpack
+from autolightning.nn.barlow_twins_losses import BarlowTwinsLoss
+from autolightning.types import Phase, AutoModuleKwargsNoCriterion, AutoModuleKwargs, Unpack
 
 
 class ContrastiveLoss(nn.Module):
@@ -23,59 +23,40 @@ class ContrastiveLoss(nn.Module):
         return loss
 
 
-def multi_argument_forward(module: nn.Module, *args):
-    return module(*args)
-
-
-def siamese_forward(module: nn.Module, input1, input2):
-    return multi_argument_forward(module, input1, input2)
-
-
 def siamese_shared_step(module: AutoModule, batch):
     input1, input2, label = batch
-    output1, output2 = module(input1, input2)
+    output1, output2 = module(input1), module(input2)
 
     return (output1, output2, label)
 
 
 class SiameseMixin:
-    def __init__(self, criterion: Optional[nn.Module] = None, **kwargs: Unpack[AutoModuleKwargsNoCriterion]):
-        if criterion == None:
-            criterion = ContrastiveLoss()
-
-        super().__init__(criterion=criterion, **kwargs)
+    def __init__(self, margin: float = 1.0, **kwargs: Unpack[AutoModuleKwargs]):
+        if kwargs.get("criterion", None) == None:
+            super().__init__(criterion=ContrastiveLoss(margin), **kwargs)
+        else:
+            super().__init__(**kwargs)
 
 
 class Siamese(SiameseMixin, AutoModule):
-    def forward(self, input1, input2):
-        return siamese_forward(self.net, input1, input2)
-    
     def shared_step(self, phase: Phase, batch, batch_idx):
         return siamese_shared_step(self, batch)
 
 
-def triplet_forward(module: nn.Module, anchor, positive, negative):
-    return multi_argument_forward(module, positive, negative)
-
-
 def triplet_shared_step(module: AutoModule, batch):
-    anchor, positive, negative = batch
-    output_anch, output_pos, output_neg = module(module, anchor, positive, negative)
+    anchor, positive, negative, _, _ = batch
 
-    return (output_anch, output_pos, output_neg)
+    return module(anchor), module(positive), module(negative)
 
 
 class TripletMixin:
-    def __init__(self, criterion: Optional[nn.Module] = None, **kwargs: Unpack[AutoModuleKwargsNoCriterion]):
-        if criterion == None:
-            criterion = nn.TripletMarginLoss()
-
-        super().__init__(criterion=criterion, **kwargs)
+    def __init__(self, margin: float = 1.0, p: int = 2, swap: bool = False, **kwargs: Unpack[AutoModuleKwargs]):
+        if kwargs.get("criterion", None) == None:
+            super().__init__(**{**kwargs, **dict(criterion=nn.TripletMarginLoss(margin=margin, p=p, swap=swap))})
+        else:
+            super().__init__(**kwargs)
 
 
 class Triplet(TripletMixin, AutoModule):
-    def forward(self, anchor, positive, negative):
-        return triplet_forward(self.net, anchor, positive, negative)
-    
     def shared_step(self, phase: Phase, batch, batch_idx):
         return triplet_shared_step(self, batch)
