@@ -259,8 +259,8 @@ class AutoDataModule(L.LightningDataModule):
             return TransformedIterable(dataset, transform, target_transform)
         else:
             return Transformed(dataset, transform, target_transform)
-    
-    def get_dataloader(self, phase: Phase, dataset: Dataset):
+        
+    def get_dataloader_kwargs(self, phase: Phase):
         # If the dataloader configuration is specified per phase...
         if any(key in self.dataloaders for key in ALLOWED_DATASET_KEYS):
             assert set(self.dataloaders.keys()) - set(ALLOWED_DATASET_KEYS) == set(), f"Unsupported keys in dataloader configuration: {set(self.dataloaders.keys()) - set(ALLOWED_DATASET_KEYS)}; only {ALLOWED_DATASET_KEYS} are allowed"
@@ -269,6 +269,10 @@ class AutoDataModule(L.LightningDataModule):
         else:
             kwargs = self.dataloaders
 
+        return kwargs
+    
+    def get_dataloader(self, phase: Phase, dataset: Dataset):
+        kwargs = self.get_dataloader_kwargs(phase)
         return DataLoader(dataset, **kwargs)
 
     def train_dataloader(self):
