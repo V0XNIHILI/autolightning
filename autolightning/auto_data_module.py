@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Union, Callable
+from typing import Dict, Optional, Union, Callable, Literal
 
 import lightning as L
 
@@ -111,6 +111,30 @@ def build_transform(stage: str, transforms: TransformType) -> (Callable | None):
     return compose_if_list(tfs)
 
 
+def apply_batch_transforms(batch, key: str, transforms: dict, target_batch_transforms: dict):
+    tf = transforms.get(key, None)
+    id = lambda x: x
+
+    if tf is not None:
+        if target_batch_transforms == "combine":
+            return tf(batch)
+        
+        tft = target_batch_transforms.get(key, None) or id
+
+        x, y = batch
+
+        return tf(x), tft(y)
+
+    if target_batch_transforms == "combine":
+        raise ValueError("Target batch transform is set to 'combine' but batch transform is not set")
+    
+    tft = target_batch_transforms.get(key, None) or id
+
+    x, y = batch
+
+    return x, tft(y)
+
+
 class AutoDataModule(L.LightningDataModule):
 
     def __init__(self,
@@ -119,6 +143,7 @@ class AutoDataModule(L.LightningDataModule):
                  transforms: Optional[TransformType] = None,
                  target_transforms: Optional[TransformType] = None,
                  batch_transforms: Optional[TransformType] = None,
+                 target_batch_transforms: Optional[Union[TransformType, Literal["combine"]]] = "combine",
                  requires_prepare: bool = True,
                  pre_load: Union[Dict[str, bool], bool] = False,
                  random_split: Optional[Dict[str, Union[Union[int, float], Union[str, Dict[str, Union[int, float]]]]]] = None):
@@ -146,6 +171,7 @@ class AutoDataModule(L.LightningDataModule):
         self.transforms = {} if transforms is None else transforms
         self.target_transforms = {} if target_transforms is None else target_transforms
         self.batch_transforms = {} if batch_transforms is None else batch_transforms
+        self.target_batch_transforms = {} if target_batch_transforms is None else target_batch_transforms
 
         self.requires_prepare = requires_prepare
         self.pre_load = pre_load
@@ -288,17 +314,15 @@ class AutoDataModule(L.LightningDataModule):
         return self.get_dataloader('predict', self.get_transformed_dataset('predict'))
     
     def on_before_batch_transfer(self, batch, dataloader_idx: int):
-        tf = self.batch_transforms.get("pre", None)
-
-        if tf is not None:
-            return tf(batch)
-        
-        return batch
+        return apply_batch_transforms(
+            batch, "before",
+            self.batch_transforms,
+            self.target_batch_transforms
+        )
     
     def on_after_batch_transfer(self, batch, dataloader_idx: int):
-        tf = self.batch_transforms.get("post", None)
-
-        if tf is not None:
-            return tf(batch)
-        
-        return batch
+        return apply_batch_transforms(
+            batch, "after",
+            self.batch_transforms,
+            self.target_batch_transforms
+        )
