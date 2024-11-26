@@ -102,7 +102,7 @@ def build_transform(stage: str, transforms: TransformType) -> (Callable | None):
     return compose_if_list(tfs)
 
 
-def apply_batch_transforms(batch, key: str, transforms: dict, target_batch_transforms: dict):
+def apply_batch_transforms(batch, key: str, transforms: dict, target_batch_transforms: Union[dict, str]):
     tf = transforms.get(key, None)
     id = lambda x: x
 
