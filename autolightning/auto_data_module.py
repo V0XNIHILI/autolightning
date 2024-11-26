@@ -117,7 +117,7 @@ def apply_batch_transforms(batch, key: str, transforms: dict, target_batch_trans
         return tf(x), tft(y)
 
     if target_batch_transforms == "combine":
-        raise ValueError("Target batch transform is set to 'combine' but batch transform is not set")
+        return batch
     
     tft = target_batch_transforms.get(key, None) or id
 
