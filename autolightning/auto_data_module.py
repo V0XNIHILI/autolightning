@@ -55,12 +55,17 @@ def instantiate_datasets(dataset: Optional[Union[Dict[str, Dataset], Dict, Datas
 
             defaults = dataset[ARGS_KEY].get("defaults", {})
 
+            # Check which keys to initialize, optionally including the default key
+            keys_to_init = []
+
+            if "defaults" in dataset[ARGS_KEY] and len(dataset[ARGS_KEY]) == len(STAGES) + 1:
+                keys_to_init = STAGES
+            else:
+                keys_to_init = dataset[ARGS_KEY]
+
             dataset_dict = {}
             
-            for key in dataset[ARGS_KEY].keys():
-                if key == "defaults":
-                    continue
-
+            for key in keys_to_init:
                 init["init_args"] = dict(defaults) | (dataset[ARGS_KEY].get(key, {}))
 
                 if type(init["class_path"]) is str:
@@ -116,6 +121,7 @@ def apply_batch_transforms(batch, key: str, transforms: dict, target_batch_trans
 
         return tf(x), tft(y)
 
+    # If tf is already None and target_batch_transforms is also not specified, we return the batch as is
     if target_batch_transforms == "combine":
         return batch
     
