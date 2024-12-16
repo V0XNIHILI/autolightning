@@ -15,6 +15,30 @@ from lightning.pytorch.trainer import Trainer
 
 from torch_mate.utils import disable_torch_debug_apis, configure_cuda
 
+from .utils import compile
+
+
+class InstantiatorCallable:
+    def __init__(self, cli: LightningCLI):
+        self.cli = cli
+
+    def __call__(self, class_type, *args, **kwargs):
+        instance = class_type(*args, **kwargs)
+
+        config = self.cli.config[self.cli.config.subcommand]
+
+        if config.get("compiler", {}).get("function", None) != None:
+            compiler = config["compiler"]["function"]
+            compiler_kwargs = config["compiler"].get("args", None)
+
+            print(f"Using compiler: {compiler} with kwargs: {compiler_kwargs}")
+
+            return compile(instance, compiler, compiler_kwargs)
+
+        assert config.get("compiler", {}).get("args", None) == None, "Compiler function is not specified but compiler args are."
+
+        return instance
+
 
 def cc(class_path: str, init_args: Optional[dict] = None, **kwargs: Any):
     out = {"class_path": class_path}
@@ -143,6 +167,12 @@ class AutoCLI(LightningCLI):
         parser.add_argument("--torch.backends.cuda.matmul.allow_tf32", type=bool, default=False, help="Allow TF32 matmul.")
         parser.add_argument("--torch.backends.cudnn.allow_tf32", type=bool, default=True, help="Allow TF32 cuDNN operations.")
         parser.add_argument("--torch.backends.cudnn.benchmark", type=bool, default=False, help="Use cuDNN benchmark mode.")
+
+        # add compiler function name to parser, by deafult no compiler; also make sure its possible to specify kwargs for the compiler
+        parser.add_argument("--compiler.function", type=str, default=None, help="The compiler function to use.")
+        parser.add_argument("--compiler.args", type=dict, default=None, help="The kwargs to pass to the compiler function.")
+        
+        parser.add_instantiator(InstantiatorCallable(self), L.LightningModule)
     
     def before_instantiate_classes(self):
         # Get the configuration
