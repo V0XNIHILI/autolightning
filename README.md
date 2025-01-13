@@ -90,7 +90,7 @@ data = MNIST(
 )
 ```
 
-Then train using the same PyTorch Lightning trainer that you were used too:
+Then train using the same PyTorch Lightning trainer that you were used to:
 
 ```python
 from lightning.pytorch import Trainer
@@ -278,6 +278,46 @@ To run training on the combined configuration (where the values in `main.py` are
 ```bash
 autolightning fit -c main.py  -c local.yaml
 ```
+
+## Sweeps
+
+### Using `wandb`
+
+```python
+sweep_configuration = {
+        'method': 'grid',
+        'name': 'Bipartite',
+        'command': ['python', '${program}', '--config', yaml_conf, '--eval-only', '${args_no_hyphens}'],
+        'program': f"autolightning",
+        'description': '',
+        'parameters': {
+            'MODEL.X': {
+                'value': 'y'
+            }
+        }
+    }
+  metric:
+  name: val_loss
+  goal: minimize
+```
+
+Per: https://community.wandb.ai/t/separate-args-no-hyphens-keys-and-values-with-whitespace-instead-of-equal-sign/5675
+
+use wandb logger as well
+
+### Using Ray Tune
+
+Use hook from ray tune and use config dict injector
+
+
+### Optuna
+
+
+if calling a separate process, need to have a known storage directory and csv logger IMO
+
+### General
+
+Use main() but adapt before_instantiate_classes hook to inject the config dict from the sweep and return the output of the main function
 
 ## Customization
 
