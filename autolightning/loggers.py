@@ -1,5 +1,4 @@
 from typing import Dict, Mapping, Optional, Union, Literal
-import pandas as pd
 
 from lightning.pytorch.loggers import CometLogger, CSVLogger, Logger, MLFlowLogger, NeptuneLogger, TensorBoardLogger, WandbLogger
 from lightning.pytorch.utilities.rank_zero import rank_zero_only
@@ -62,6 +61,8 @@ class PandasLogger(Logger):
     def __init__(self):
         super().__init__()
 
+        import pandas as pd
+
         self._df = pd.DataFrame()
         self._hparams = {}
 
@@ -79,6 +80,8 @@ class PandasLogger(Logger):
 
     @rank_zero_only
     def log_metrics(self, metrics, step):
+        import pandas as pd
+        
         self._df = pd.concat([self._df, pd.DataFrame([{**metrics, "step": step}])], ignore_index=True)
 
     @rank_zero_only
