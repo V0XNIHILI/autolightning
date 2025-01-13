@@ -1,4 +1,5 @@
 from typing import Dict, Mapping, Optional, Union, Literal
+import pandas as pd
 
 from lightning.pytorch.loggers import CometLogger, CSVLogger, Logger, MLFlowLogger, NeptuneLogger, TensorBoardLogger, WandbLogger
 from lightning.pytorch.utilities.rank_zero import rank_zero_only
@@ -57,6 +58,44 @@ class LogKeyMixin:
         super().log_metrics(modified_metrics, step)
 
 
+class PandasLogger(Logger):
+    def __init__(self):
+        super().__init__()
+
+        self._df = pd.DataFrame()
+        self._hparams = {}
+
+    @property
+    def name(self):
+        return "PandasLogger"
+
+    @property
+    def version(self):
+        return "0.1"
+
+    @rank_zero_only
+    def log_hyperparams(self, params):
+        self._hparams = params
+
+    @rank_zero_only
+    def log_metrics(self, metrics, step):
+        self._df = pd.concat([self._df, pd.DataFrame([{**metrics, "step": step}])], ignore_index=True)
+
+    @rank_zero_only
+    def save(self):
+        pass
+
+    @rank_zero_only
+    def finalize(self, status):
+        pass
+
+    def get_logs(self):
+        return self._df
+    
+    def get_hyperparams(self):
+        return self._hparams
+
+
 # Note: I originally tried to programmatically generate the classes below using type(),
 # but the type checking of jsonargparse did not like it + static analysis tools used
 # in IDEs obviously cannot see the generated classes. So, I did it the manual way.
@@ -88,4 +127,9 @@ class AutoTensorBoardLogger(LogKeyMixin, TensorBoardLogger):
 class AutoWandbLogger(LogKeyMixin, WandbLogger):
     pass
 
-__all__ = ["AutoCometLogger", "AutoCSVLogger", "AutoLogger", "AutoMLFlowLogger", "AutoNeptuneLogger", "AutoTensorBoardLogger", "AutoWandbLogger"]
+
+class AutoPandasLogger(LogKeyMixin, PandasLogger):
+    pass
+
+
+__all__ = ["AutoCometLogger", "AutoCSVLogger", "AutoLogger", "AutoMLFlowLogger", "AutoNeptuneLogger", "AutoTensorBoardLogger", "AutoWandbLogger", "PandasLogger", "AutoPandasLogger"]
