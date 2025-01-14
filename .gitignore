@@ -12,6 +12,7 @@ wandb
 .neptune
 data
 lightning_logs
+*.ckpt
 
 .vscode
 
