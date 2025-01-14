@@ -162,12 +162,26 @@ class AutoDataModule(L.LightningDataModule):
         - `self.on_after_batch_transfer(self, batch, dataloader_idx)`: calls `self.reshape_batch_during_transfer(batch, dataloader_idx, "after")` followed by `self.pre_transfer_batch_transform(batch)`
 
         Args:
+            requires_prepare: bool
+                A boolean that specifies whether the dataset needs to be prepared before it can be used.
+            pre_load (Union[Dict[str, bool], bool]):
+                A boolean or dictionary that specifies whether to pre-load the dataset into memory before training.
+                If a dictionary is specified, it must contain one or more of the keys `train`, `val`, `test` and
+                `pred` to specify whether to pre-load the respective dataset. If a boolean is specified, it will
+                be used as the default value for all phases.
             random_split (Optional[Dict[str, Union[int, float]]]): 
                 A dictionary that specifies how to split the dataset into `train`, `val`, `test` and `pred` sets.
                 For each of these keys, it is possible to specify either a float or an integer to indicate the
                 percentage or the number of samples to be used for the respective set. It is also possible split
                 the `default` dataset into multiple sets by specifying the desired set keys and the number of
                 samples per set in this dictionary.
+            cross_val (Optional[Dict[str, int]]):
+                A dictionary that specifies how to perform cross-validation on the dataset. The dictionary must
+                contain the keys `n_splits` and `fold` to specify the number of splits and the fold index to be
+                used.
+            seed (Optional[int]):
+                Seed to be used for random splitting and cross-validation. If not specified, the dataset will not
+                be shuffled before cross-validation.
         """
 
         super().__init__()
@@ -254,8 +268,6 @@ class AutoDataModule(L.LightningDataModule):
 
                 for phase_key in relevant_keys:
                     self.instantiated_dataset[phase_key] = datasets[phase_key]
-
-                # TODO! ADD WARNING HERE!
             else:
                 for phase_key in relevant_keys:
                     self.instantiated_dataset[phase_key] = datasets
@@ -337,8 +349,7 @@ class AutoDataModule(L.LightningDataModule):
 
         if transform is None and target_transform is None:
             return dataset
-        
-        # check if dataset has len attribute
+
         if not hasattr(dataset, '__len__'):
             return TransformedIterable(dataset, transform, target_transform)
         else:
@@ -347,7 +358,9 @@ class AutoDataModule(L.LightningDataModule):
     def get_dataloader_kwargs(self, phase: Phase):
         # If the dataloader configuration is specified per phase...
         if any(key in self.dataloaders for key in ALLOWED_DATASET_KEYS):
-            assert set(self.dataloaders.keys()) - set(ALLOWED_DATASET_KEYS) == set(), f"Unsupported keys in dataloader configuration: {set(self.dataloaders.keys()) - set(ALLOWED_DATASET_KEYS)}; only {ALLOWED_DATASET_KEYS} are allowed"
+            unsupported_keys = set(self.dataloaders.keys()) - set(ALLOWED_DATASET_KEYS)
+
+            assert unsupported_keys == set(), f"Unsupported keys in dataloader configuration: {unsupported_keys}; only {ALLOWED_DATASET_KEYS} are allowed"
 
             kwargs = dict(self.dataloaders.get("defaults", {})) | self.dataloaders.get(phase, {})
         else:
