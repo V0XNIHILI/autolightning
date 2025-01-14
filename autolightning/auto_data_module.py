@@ -1,5 +1,7 @@
 from typing import Dict, Optional, Union, Callable, Literal
 
+import warnings
+
 import lightning as L
 
 import torch
@@ -15,7 +17,7 @@ from .types import Phase, TransformValue
 from torch_mate.data.utils import Transformed, TransformedIterable, PreLoaded
 
 
-STAGES = ["train", "val", "test", "predict"]
+STAGES = ["train", "val", "test", "pred"]
 ALLOWED_DATASET_KEYS = STAGES + ["defaults"]
 PRE_LOAD_MOMENT = "pre_load"
 ARGS_KEY = "args"
@@ -143,7 +145,9 @@ class AutoDataModule(L.LightningDataModule):
                  target_batch_transforms: Optional[Union[TransformType, Literal["combine"]]] = "combine",
                  requires_prepare: bool = True,
                  pre_load: Union[Dict[str, bool], bool] = False,
-                 random_split: Optional[Dict[str, Union[Union[int, float], Union[str, Dict[str, Union[int, float]]]]]] = None):
+                 random_split: Optional[Dict[str, Union[int, float]]] = None,
+                 cross_val: Optional[Dict[str, int]] = None,
+                 seed: Optional[int] = 42):
         """Lightweight wrapper around PyTorch Lightning LightningDataModule that adds support for configuration via a dictionary.
 
         Overall, compared to the PyTorch Lightning LightningModule, the following two attributes are added:
@@ -153,12 +157,17 @@ class AutoDataModule(L.LightningDataModule):
         - `self.train_dataloader(self)`: calls `DataLoader(self.get_dataset('train'), **self.train_dataloader_kwargs)`
         - `self.val_dataloader(self)`: calls `DataLoader(self.get_dataset('val'), **self.val_dataloader_kwargs)`
         - `self.test_dataloader(self)`: calls `DataLoader(self.get_dataset('test'), **self.test_dataloader_kwargs)`
-        - `self.predict_dataloader(self)`: calls `DataLoader(self.get_dataset('predict'), **self.test_dataloader_kwargs)`
+        - `self.predict_dataloader(self)`: calls `DataLoader(self.get_dataset('pred'), **self.test_dataloader_kwargs)`
         - `self.on_before_batch_transfer(self, batch, dataloader_idx)`: calls `self.reshape_batch_during_transfer(batch, dataloader_idx, "before")` followed by `self.post_transfer_batch_transform(batch)`
         - `self.on_after_batch_transfer(self, batch, dataloader_idx)`: calls `self.reshape_batch_during_transfer(batch, dataloader_idx, "after")` followed by `self.pre_transfer_batch_transform(batch)`
 
         Args:
-            cfg (Dict): configuration dictionary
+            random_split (Optional[Dict[str, Union[int, float]]]): 
+                A dictionary that specifies how to split the dataset into `train`, `val`, `test` and `pred` sets.
+                For each of these keys, it is possible to specify either a float or an integer to indicate the
+                percentage or the number of samples to be used for the respective set. It is also possible split
+                the `default` dataset into multiple sets by specifying the desired set keys and the number of
+                samples per set in this dictionary.
         """
 
         super().__init__()
@@ -174,6 +183,9 @@ class AutoDataModule(L.LightningDataModule):
         self.pre_load = pre_load
 
         self.random_split = random_split
+        self.cross_val = cross_val
+
+        self.seed = seed
 
         self.instantiated_dataset: Union[Dataset, Dict[str, Dataset]] = {}
         
@@ -200,14 +212,41 @@ class AutoDataModule(L.LightningDataModule):
         elif stage == 'test':
             relevant_keys = ['test']
         elif stage == 'predict':
-            relevant_keys = ['predict']
+            relevant_keys = ['pred']
         elif stage == 'validate':
             relevant_keys = ['val']
 
-        generator = torch.Generator().manual_seed(42)
+        generator = torch.Generator()
+
+        if self.seed is not None:
+            generator = generator.manual_seed(self.seed)
+
+        # Perform XOR
+        if self.cross_val and self.random_split:
+            warnings.warn("Both random_split and cross_val are specified; only cross_val will be used. Make sure that this is intended behaviour.")
 
         if isinstance(datasets, Dataset):
-            if isinstance(self.random_split, dict):
+            if self.cross_val:
+                if not isinstance(self.cross_val, dict):
+                    raise TypeError(f"Unsupported cross-validation configuration: {self.cross_val}; must be a dictionary")
+
+                assert self.cross_val["n_splits"] > self.cross_val["fold"] >= 0, f"Invalid fold index {self.cross_val['fold']} for {self.cross_val['n_splits']} splits"
+
+                from sklearn.model_selection import KFold
+
+                shuffle = self.seed is not None
+
+                kf = KFold(n_splits=self.cross_val["n_splits"], shuffle=shuffle, random_state=self.seed)
+
+                for i, (train_indices, val_indices) in enumerate(kf.split(datasets)):
+                    if i == self.cross_val["fold"]:
+                        self.instantiated_dataset['train'] = torch.utils.data.Subset(datasets, train_indices)
+                        self.instantiated_dataset['val'] = torch.utils.data.Subset(datasets, val_indices)
+                        break
+            elif self.random_split:
+                if not isinstance(self.random_split, dict):
+                    raise TypeError(f"Unsupported random split configuration: {self.random_split}; must be a dictionary")
+
                 assert set(self.random_split.keys()) - set(STAGES) == set(), f"Unsupported keys in random split configuration: {set(self.random_split.keys()) - set(STAGES)}"
 
                 dataset_splits = torch_random_split(datasets, self.random_split.values(), generator=generator)
@@ -227,22 +266,44 @@ class AutoDataModule(L.LightningDataModule):
                 if phase_key in instantiate_dataset_keys:
                     continue
 
-                new_phase_key = "defaults" if phase_key not in datasets else phase_key
+                is_default = phase_key not in datasets
+                new_phase_key = "defaults" if is_default else phase_key
 
-                if new_phase_key == "defaults" and new_phase_key not in datasets:
+                if is_default and "defaults" not in datasets:
                     raise ValueError(f"Phase key {phase_key} not found in dataset configuration; also no defaults found")
 
                 dataset = datasets[new_phase_key]
                     
-                if isinstance(self.random_split, dict) and self.random_split["source"] == new_phase_key:
-                    dataset_splits = torch_random_split(dataset, self.random_split["dest"].values(), generator=generator)
-                    
-                    new_datasets = dict(zip(self.random_split["dest"].keys(), dataset_splits))
+                if is_default and (self.random_split is not None or self.cross_val is not None):
+                    if self.cross_val:
+                        if not isinstance(self.cross_val, dict):
+                            raise TypeError(f"Unsupported cross-validation configuration: {self.cross_val}; must be a dictionary")
 
-                    for split_key, split_dataset in new_datasets.items():
-                        self.instantiated_dataset[split_key] = split_dataset
+                        assert self.cross_val["n_splits"] > self.cross_val["fold"] >= 0, f"Invalid fold index {self.cross_val['fold']} for {self.cross_val['n_splits']} splits"
 
-                    instantiate_dataset_keys.extend(new_datasets.keys())
+                        from sklearn.model_selection import KFold
+
+                        shuffle = self.seed is not None
+
+                        kf = KFold(n_splits=self.cross_val["n_splits"], shuffle=shuffle, random_state=self.seed)
+
+                        for i, (train_indices, val_indices) in enumerate(kf.split(dataset)):
+                            if i == self.cross_val["fold"]:
+                                self.instantiated_dataset['train'] = torch.utils.data.Subset(dataset, train_indices)
+                                self.instantiated_dataset['val'] = torch.utils.data.Subset(dataset, val_indices)
+                                instantiate_dataset_keys.extend(['train', 'val'])
+                    else:
+                        # Cannot create a random split for a dataset that is already specified
+                        assert set(datasets.keys()).isdisjoint(set(self.random_split.keys())), f"Random split configuration contains keys that are already present in the dataset configuration: {set(datasets.keys()) & set(self.random_split.keys())}"
+
+                        dataset_splits = torch_random_split(dataset, self.random_split["dest"].values(), generator=generator)
+                        
+                        new_datasets = dict(zip(self.random_split["dest"].keys(), dataset_splits))
+
+                        for split_key, split_dataset in new_datasets.items():
+                            self.instantiated_dataset[split_key] = split_dataset
+
+                        instantiate_dataset_keys.extend(new_datasets.keys())
                 else:
                     self.instantiated_dataset[phase_key] = dataset
                     instantiate_dataset_keys.append(phase_key)
@@ -308,7 +369,7 @@ class AutoDataModule(L.LightningDataModule):
         return self.get_dataloader('test', self.get_transformed_dataset('test'))
     
     def predict_dataloader(self):
-        return self.get_dataloader('predict', self.get_transformed_dataset('predict'))
+        return self.get_dataloader('pred', self.get_transformed_dataset('pred'))
     
     def on_before_batch_transfer(self, batch, dataloader_idx: int):
         return apply_batch_transforms(

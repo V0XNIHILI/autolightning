@@ -69,8 +69,6 @@ To run supervised learning on MNIST, with a simple FC layer, the following code 
 from autolightning.lm import Classifier
 from autolightning.datasets import MNIST
 
-from functools import partial
-
 import torch
 import torch.nn as nn
 
@@ -85,7 +83,7 @@ model = Classifier(
 
 data = MNIST(
     root="data",
-    dataloaders=dict(batch_size=128)
+    dataloaders=dict(batch_size=128),
     transforms=[transforms.ToTensor(), nn.Flatten(start_dim=0)]
 )
 ```
