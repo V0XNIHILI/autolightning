@@ -290,25 +290,27 @@ import torch.nn as nn
 
 from torchvision import transforms
 
-n_folds = 5
+n_splits = 5
 
 data = lambda i: MNIST(
     root="data",
     dataloaders=dict(batch_size=128),
     transforms=[transforms.ToTensor(), nn.Flatten(start_dim=0)],
     # Specify the cross validation setup
-    cross_val=dict(n_folds=n_folds, fold=i)
+    cross_val=dict(n_splits=n_splits, fold=i)
 )
 
-for i in range(n_folds):
+for fold_idx in range(n_splits):
+    net = nn.Linear(28*28, 10)
+
     model = Classifier(
-        net=nn.Linear(28*28, 10), 
+        net=net, 
         optimizer=torch.optim.Adam(net.parameters(), lr=0.003)
     )
 
-    trainer = Trainer(max_epochs=10)
+    trainer = Trainer(max_epochs=2)
 
-    trainer.fit(model, data(i))
+    trainer.fit(model, data(fold_idx))
 ```
 
 ## Sweeps
