@@ -277,6 +277,40 @@ To run training on the combined configuration (where the values in `main.py` are
 autolightning fit -c main.py  -c local.yaml
 ```
 
+## K-fold cross-validation
+
+See the following example for how to use k-fold cross-validation in `autolightning`:
+
+```python
+from autolightning.lm import Classifier
+from autolightning.datasets import MNIST
+
+import torch
+import torch.nn as nn
+
+from torchvision import transforms
+
+n_folds = 5
+
+data = lambda i: MNIST(
+    root="data",
+    dataloaders=dict(batch_size=128),
+    transforms=[transforms.ToTensor(), nn.Flatten(start_dim=0)],
+    # Specify the cross validation setup
+    cross_val=dict(n_folds=n_folds, fold=i)
+)
+
+for i in range(n_folds):
+    model = Classifier(
+        net=nn.Linear(28*28, 10), 
+        optimizer=torch.optim.Adam(net.parameters(), lr=0.003)
+    )
+
+    trainer = Trainer(max_epochs=10)
+
+    trainer.fit(model, data(i))
+```
+
 ## Sweeps
 
 ### Using `wandb`
