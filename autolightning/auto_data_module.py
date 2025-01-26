@@ -362,7 +362,7 @@ class AutoDataModule(L.LightningDataModule):
 
             assert unsupported_keys == set(), f"Unsupported keys in dataloader configuration: {unsupported_keys}; only {ALLOWED_DATASET_KEYS} are allowed"
 
-            kwargs = dict(self.dataloaders.get("defaults", {})) | self.dataloaders.get(phase, {})
+            kwargs = self.dataloaders.get("defaults", {}) | self.dataloaders.get(phase, {})
         else:
             kwargs = self.dataloaders
 
