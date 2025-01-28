@@ -76,11 +76,15 @@ class AutoDataModuleKwargs(TypedDict, total=False):
     requires_prepare: bool
     pre_load: Union[Dict[str, bool], bool]
     random_split: Optional[Dict[str, Union[Union[int, float], Union[str, Dict[str, Union[int, float]]]]]]
+    cross_val: Optional[Dict[str, int]]
+    seed: Optional[int]
 
 
-class AutoDataModuleKwargsNoDatsetPrepareSplit(TypedDict, total=False):
+class AutoDataModuleKwargsNoDatasetPrepareSplit(TypedDict, total=False):
     dataloaders: Optional[Dict]
     transforms: Optional[Callable]
     target_transforms: Optional[Callable]
     batch_transforms: Optional[Callable]
     pre_load: Union[Dict[str, bool], bool]
+    cross_val: Optional[Dict[str, int]]
+    seed: Optional[int]

@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 
 from lightning.pytorch.cli import OptimizerCallable, LRSchedulerCallable
+from pytorch_lightning.cli import instantiate_class
 
 
 LIGHTNING_STATE_DICT_KEYS = [
@@ -94,3 +95,28 @@ def sched(lr_scheduler_path: str, **kwargs: Any) -> LRSchedulerCallable:
     scheduler_class = _import_module(lr_scheduler_path, default_module="torch.optim.lr_scheduler")
 
     return partial(scheduler_class, **kwargs)
+
+
+def init_kwargs(config: Dict) -> Dict:
+    """
+    Recursively traverses a nested structure to replace dictionaries with a
+    `class_path` key using the `instantiate_class` function.
+
+    Args:
+        config (Any): The input nested structure (dict, list, tuple, etc.).
+
+    Returns:
+        The modified structure with instantiated classes.
+    """
+
+    if isinstance(config, dict):
+        if "class_path" in config:
+            return instantiate_class(tuple(), config)
+
+        return {key: init_kwargs(value) for key, value in config.items()}
+    elif isinstance(config, list):
+        return [init_kwargs(item) for item in config]
+    elif isinstance(config, tuple):
+        return tuple(init_kwargs(item) for item in config)
+
+    return config

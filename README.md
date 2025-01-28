@@ -69,8 +69,6 @@ To run supervised learning on MNIST, with a simple FC layer, the following code 
 from autolightning.lm import Classifier
 from autolightning.datasets import MNIST
 
-from functools import partial
-
 import torch
 import torch.nn as nn
 
@@ -85,12 +83,12 @@ model = Classifier(
 
 data = MNIST(
     root="data",
-    dataloaders=dict(batch_size=128)
+    dataloaders=dict(batch_size=128),
     transforms=[transforms.ToTensor(), nn.Flatten(start_dim=0)]
 )
 ```
 
-Then train using the same PyTorch Lightning trainer that you were used too:
+Then train using the same PyTorch Lightning trainer that you were used to:
 
 ```python
 from lightning.pytorch import Trainer
@@ -278,6 +276,82 @@ To run training on the combined configuration (where the values in `main.py` are
 ```bash
 autolightning fit -c main.py  -c local.yaml
 ```
+
+## K-fold cross-validation
+
+See the following example for how to use k-fold cross-validation in `autolightning`:
+
+```python
+from autolightning.lm import Classifier
+from autolightning.datasets import MNIST
+
+import torch
+import torch.nn as nn
+
+from torchvision import transforms
+
+n_splits = 5
+
+data = lambda i: MNIST(
+    root="data",
+    dataloaders=dict(batch_size=128),
+    transforms=[transforms.ToTensor(), nn.Flatten(start_dim=0)],
+    # Specify the cross validation setup
+    cross_val=dict(n_splits=n_splits, fold=i)
+)
+
+for fold_idx in range(n_splits):
+    net = nn.Linear(28*28, 10)
+
+    model = Classifier(
+        net=net, 
+        optimizer=torch.optim.Adam(net.parameters(), lr=0.003)
+    )
+
+    trainer = Trainer(max_epochs=2)
+
+    trainer.fit(model, data(fold_idx))
+```
+
+## Sweeps
+
+### Using `wandb`
+
+```python
+sweep_configuration = {
+        'method': 'grid',
+        'name': 'Bipartite',
+        'command': ['python', '${program}', '--config', yaml_conf, '--eval-only', '${args_no_hyphens}'],
+        'program': f"autolightning",
+        'description': '',
+        'parameters': {
+            'MODEL.X': {
+                'value': 'y'
+            }
+        }
+    }
+  metric:
+  name: val_loss
+  goal: minimize
+```
+
+Per: https://community.wandb.ai/t/separate-args-no-hyphens-keys-and-values-with-whitespace-instead-of-equal-sign/5675
+
+use wandb logger as well
+
+### Using Ray Tune
+
+Use hook from ray tune and use config dict injector
+
+
+### Optuna
+
+
+if calling a separate process, need to have a known storage directory and csv logger IMO
+
+### General
+
+Use main() but adapt before_instantiate_classes hook to inject the config dict from the sweep and return the output of the main function
 
 ## Customization
 
