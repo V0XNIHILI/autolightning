@@ -19,13 +19,24 @@ from torch_mate.utils import disable_torch_debug_apis, configure_cuda
 def cc(class_path: str, init_args: Optional[dict] = None, **kwargs: Any):
     out = {"class_path": class_path}
 
+    # Use dict kwargs instead of init_args since both "autolightning.optim" and "autolightning.sched"
+    # do not have named arguments but only **kwargs. The Lightning CLI does support that, but it requires
+    # the use of the `dict_kwargs` key in the configuration file.
+    use_dict_kwargs = class_path in ["autolightning.optim", "autolightning.sched"]
+
     if init_args is not None:
         if kwargs:
             raise ValueError("Cannot provide both init_args and kwargs")
 
-        out["init_args"] = init_args
+        if use_dict_kwargs:
+            out["dict_kwargs"] = init_args
+        else:
+            out["init_args"] = init_args
     elif kwargs != {}:
-        out["init_args"] = kwargs
+        if use_dict_kwargs:
+            out["dict_kwargs"] = kwargs
+        else:
+            out["init_args"] = kwargs
 
     return out
 
