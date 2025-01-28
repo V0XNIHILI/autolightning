@@ -156,8 +156,10 @@ class AutoCLI(LightningCLI):
         parser.add_argument("--torch.backends.cudnn.benchmark", type=bool, default=False, help="Use cuDNN benchmark mode.")
     
     def before_instantiate_classes(self):
-        # Get the configuration
-        cfg = self.config[self.config.subcommand]
+        if self.subcommand is None:
+            cfg = self.config
+        else:
+            cfg = self.config[self.subcommand]
 
         torch_cfg = cfg["torch"]
         torch_autograd_cfg = torch_cfg["autograd"]
