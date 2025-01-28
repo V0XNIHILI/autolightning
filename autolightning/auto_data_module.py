@@ -57,17 +57,16 @@ def instantiate_datasets(dataset: Optional[Union[Dict[str, Dataset], Dict, Datas
 
             defaults = dataset[ARGS_KEY].get("defaults", {})
 
-            # Check which keys to initialize, optionally including the default key
-            keys_to_init = []
-
-            if "defaults" in dataset[ARGS_KEY] and len(dataset[ARGS_KEY]) == len(STAGES) + 1:
-                keys_to_init = STAGES
-            else:
-                keys_to_init = dataset[ARGS_KEY]
 
             dataset_dict = {}
+
+            contains_all_keys = all(key in dataset[ARGS_KEY] for key in ALLOWED_DATASET_KEYS)
             
-            for key in keys_to_init:
+            for key in dataset[ARGS_KEY].keys():
+                # If all stage keys are present, then there is no need to instantiate the default dataset
+                if contains_all_keys and key == "defaults":
+                    continue
+
                 init["init_args"] = dict(defaults) | (dataset[ARGS_KEY].get(key, {}))
 
                 if type(init["class_path"]) is str:
