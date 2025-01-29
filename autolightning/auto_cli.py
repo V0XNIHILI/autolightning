@@ -125,6 +125,19 @@ class ActionConfigFilePython(ActionConfigFile):
             temp_file_path = write_to_temp_file(yaml.dump(dict_variable))
 
             values = temp_file_path
+        elif values == "//wandb_sweep":
+            import wandb
+
+            # This run will be reused by Lightning during the run
+            # when the WandbLogger is used
+            wandb.init()
+
+            wandb_config = dict(wandb.config)
+
+            # Write the contents to a temporary file
+            temp_file_path = write_to_temp_file(yaml.dump(wandb_config))
+
+            values = temp_file_path
 
         super().__call__(parser, cfg, values, option_string)
 
