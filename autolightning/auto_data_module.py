@@ -108,19 +108,29 @@ def build_transform(stage: str, transforms: TransformType) -> (Callable | None):
     return compose_if_list(tfs)
 
 
+def iteratively_apply_transform(batch, transforms):
+    if type(transforms) is list:
+        for tf in transforms:
+            batch = tf(batch)
+    else:
+        batch = transforms(batch)
+    
+    return batch
+
+
 def apply_batch_transforms(batch, key: str, transforms: dict, target_batch_transforms: Union[dict, str]):
     tf = transforms.get(key, None)
     id = lambda x: x
 
     if tf is not None:
         if target_batch_transforms == "combine":
-            return tf(batch)
+            return iteratively_apply_transform(batch, tf)
         
         tft = target_batch_transforms.get(key, None) or id
 
         x, y = batch
 
-        return tf(x), tft(y)
+        return iteratively_apply_transform(x, tf), iteratively_apply_transform(y, tft)
 
     # If tf is already None and target_batch_transforms is also not specified, we return the batch as is
     if target_batch_transforms == "combine":
@@ -130,7 +140,7 @@ def apply_batch_transforms(batch, key: str, transforms: dict, target_batch_trans
 
     x, y = batch
 
-    return x, tft(y)
+    return x, iteratively_apply_transform(y, tft)
 
 
 class AutoDataModule(L.LightningDataModule):
