@@ -167,6 +167,10 @@ class AutoCLI(LightningCLI):
         parser.add_argument("--torch.backends.cuda.matmul.allow_tf32", type=bool, default=False, help="Allow TF32 matmul.")
         parser.add_argument("--torch.backends.cudnn.allow_tf32", type=bool, default=True, help="Allow TF32 cuDNN operations.")
         parser.add_argument("--torch.backends.cudnn.benchmark", type=bool, default=False, help="Use cuDNN benchmark mode.")
+
+        # Add other arguments
+        # torch.set_num_threads
+        parser.add_argument("--torch.set_num_threads", type=int, default=-1, help="Sets the number of threads used for intraop parallelism on CPU.")
     
     def before_instantiate_classes(self):
         if self.subcommand is None:
@@ -193,3 +197,8 @@ class AutoCLI(LightningCLI):
             torch_backends_cudnn_cfg["allow_tf32"],
             torch_backends_cudnn_cfg["benchmark"]
         )
+
+        if torch_cfg["set_num_threads"] != -1:
+            import torch
+
+            torch.set_num_threads(torch_cfg["set_num_threads"])
