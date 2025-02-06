@@ -77,6 +77,13 @@ class BrevitasMixin:
 
         self.limit_calibration_batches = limit_calibration_batches
 
+        if limit_calibration_batches is not None:
+            assert self.calibrate or self.correct_biases or self.correct_norms, "Calibration or bias correction or norm correction must be enabled to limit calibration batches."
+
+        if self.calibrate or self.correct_biases or self.correct_norms:
+            assert self.limit_calibration_batches is not None, "Limit calibration batches must be set if calibration or bias correction or norm correction is enabled."
+            assert self.limit_calibration_batches > 0, "Limit calibration batches must be greater than 0."
+
         self.prepare_model()
 
     def prepare_model(self):
@@ -123,17 +130,19 @@ class BrevitasMixin:
     def on_train_batch_start(self, batch: Any, batch_idx: int) -> Optional[int]:
         out = super().on_train_batch_start(batch, batch_idx)
 
-        if self.current_context is None and self.limit_calibration_batches != 0:
+        if self.current_context is None and self.limit_calibration_batches != None:
             context_name = _get_first_context(self.contexts_to_enter, self.contexts_exited)
 
             if context_name is not None:
-                self.no_grad_context.__enter__()
+                if context_name == "calibrate_context":
+                    # Only enter no_grad context if the calibrate context is entered
+                    self.no_grad_context.__enter__()
 
                 context = getattr(self, context_name)
                 context.__enter__()
                 self.current_context = context
 
-                print(f"Starting {context_name[:-8]} operation.")
+                print(f"Starting {context_name[:-8]} operation...")
 
         return out
     
@@ -142,12 +151,13 @@ class BrevitasMixin:
             self.current_context.__exit__(None, None, None)
             self.current_context = None
 
-            self.no_grad_context.__exit__(None, None, None)
-
             current_context_name = _get_first_context(self.contexts_to_enter, self.contexts_exited)
             self.contexts_exited.append(current_context_name)
 
-            print(f"Completed {current_context_name[:-8]} operation.")
+            if current_context_name == "calibrate_context":
+                self.no_grad_context.__exit__(None, None, None)
+
+            print(f"Completed {current_context_name[:-8]} operation!")
 
     def on_train_batch_end(self, outputs: STEP_OUTPUT, batch: Any, batch_idx: int) -> None:
         super().on_train_batch_end(outputs, batch, batch_idx)
@@ -155,12 +165,6 @@ class BrevitasMixin:
         if self.limit_calibration_batches is not None:
             if (batch_idx + 1) % self.limit_calibration_batches == 0:
                 self.exit_quant_context_if_exists()
-
-    def on_train_epoch_end(self) -> None:
-        super().on_train_epoch_end()
-        
-        if self.limit_calibration_batches == None:
-            self.exit_quant_context_if_exists()
 
     def training_step(self, *args, **kwargs):
         output = super().training_step(*args, **kwargs)
