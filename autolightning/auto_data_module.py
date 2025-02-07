@@ -330,6 +330,9 @@ class AutoDataModule(L.LightningDataModule):
                     instantiate_dataset_keys.append(phase_key)
 
     def get_dataset(self, phase: Phase):
+        if phase not in self.instantiated_dataset:
+            raise KeyError(f"Dataset for phase {phase} not found; make sure to call `setup` before accessing the dataset")
+            
         return self.instantiated_dataset[phase]
     
     def get_transformed_dataset(self, phase: Phase):
