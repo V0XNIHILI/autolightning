@@ -12,6 +12,7 @@ from brevitas.graph.calibrate import bias_correction_mode, calibration_mode, nor
 import brevitas
 from brevitas_utils import create_qat_ready_model, allow_quant_tensor_slicing as allow_slicing
 from brevitas_utils.creation import create_quantizer
+from brevitas_utils.bias_correction import add_zero_bias_to_linear
 
 from . import Supervised, Classifier, Prototypical
 from ..utils import _import_module
@@ -118,6 +119,7 @@ class BrevitasMixin:
 
         if self.correct_biases:
             self.contexts_to_enter.append("correct_biases_context")
+            self.net = add_zero_bias_to_linear(self.net)
 
         if self.correct_norms:
             self.contexts_to_enter.append("correct_norms_context")
