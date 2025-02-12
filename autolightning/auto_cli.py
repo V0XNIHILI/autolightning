@@ -113,6 +113,10 @@ class ActionConfigFilePython(ActionConfigFile):
                 config_name = "config"
 
             variable = getattr(module, config_name)
+
+            if callable(variable):
+                variable = variable()
+
             dict_variable = dict(variable)
 
             # Loop through all nested keys and replace all tuples with lists
