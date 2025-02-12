@@ -49,7 +49,7 @@ def auto_main(config: Optional[Union[List[dict], dict]] = None, subcommand: Opti
         assert subcommand is None, "subcommand must be None if config is None."
         assert run == True, "run must be True if config is None."
 
-    return AutoCLI(
+    cli = AutoCLI(
         AutoModule,
         args=final_config,
         run=run,
@@ -58,6 +58,8 @@ def auto_main(config: Optional[Union[List[dict], dict]] = None, subcommand: Opti
         parser_kwargs={"parser_mode": "omegaconf"},
         save_config_callback=LoggerSaveConfigCallback
     )
+
+    return cli.trainer, cli.model, cli.datamodule
 
 
 def cli_main():
