@@ -24,7 +24,7 @@ dependencies = [
 ]
 
 [project.scripts]
-autolightning = "autolightning.cli:main"
+autolightning = "autolightning.main:cli_main"
 
 [build-system]
 requires = ["hatchling"]
