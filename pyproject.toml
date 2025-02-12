@@ -19,6 +19,7 @@ dependencies = [
   'lightning',
   'torchmetrics',
   'jsonargparse[signatures]',
+  'omegaconf',
   "typing_extensions; python_version < '3.11'",
   'torch-mate@git+https://github.com/V0XNIHILI/torch-mate'
 ]
