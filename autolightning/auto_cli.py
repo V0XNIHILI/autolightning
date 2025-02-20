@@ -178,8 +178,8 @@ class AutoCLI(LightningCLI):
 
         # Add arguments for wandb.watch
         parser.add_argument("--wandb.watch.enable", type=bool, default=False, help="Whether to enable wandb.watch.")
-        parser.add_argument("--wandb.watch.models", type=Union[str, List[str]], default=None, help="A single model or a sequence of models to be monitored.")
-        parser.add_argument("--wandb.watch.criterion", type=str, default=None, help="The loss function being optimized (optional).")
+        parser.add_argument("--wandb.watch.models", type=Optional[Union[str, List[str]]], default="net", help="A single model or a sequence of models to be monitored.")
+        parser.add_argument("--wandb.watch.criterion", type=Optional[str], default="criterion", help="The loss function being optimized (optional).")
         parser.add_argument("--wandb.watch.log", type=Optional[Literal['gradients', 'parameters', 'all']], default="gradients", help="Specifies whether to log gradients, parameters, or all. Set to None to disable logging.")
         parser.add_argument("--wandb.watch.log_freq", type=int, default=1000, help="How frequently to log gradients and parameters, expressed in batches.")
         parser.add_argument("--wandb.watch.idx", type=int, default=None, help="Index used when tracking multiple models with wandb.watch.")
@@ -188,13 +188,13 @@ class AutoCLI(LightningCLI):
     def _get_wandb_watch_models(self):
         wandb_watch_models = self.config["fit"]["wandb"]["watch"]["models"]
 
-        models = self.model
-
         if wandb_watch_models is not None:
             if isinstance(wandb_watch_models, str):
                 models = getattr(self.model,wandb_watch_models)
             else:
                 models = [getattr(self.model, model_name) for model_name in wandb_watch_models]
+        else:
+            models = self.model
 
         return models
 
@@ -207,12 +207,12 @@ class AutoCLI(LightningCLI):
             models = self._get_wandb_watch_models()
 
             if wandb_watch_cfg["criterion"] is None:
-                criterion = self.model.criterion
+                criterion = None
             else:
                 criterion = getattr(self.model, wandb_watch_cfg["criterion"])
 
             # Set up wandb logger watching
-            self.trainer.logger.watch(
+            self.trainer.logger.experiment.watch(
                 models=models,
                 criterion=criterion,
                 log=wandb_watch_cfg["log"],
