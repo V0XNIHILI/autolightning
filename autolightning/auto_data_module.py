@@ -171,7 +171,7 @@ class AutoDataModule(L.LightningDataModule):
         - `self.on_after_batch_transfer(self, batch, dataloader_idx)`: calls `self.reshape_batch_during_transfer(batch, dataloader_idx, "after")` followed by `self.pre_transfer_batch_transform(batch)`
 
         Args:
-            requires_prepare: bool
+            requires_prepare (bool):
                 A boolean that specifies whether the dataset needs to be prepared before it can be used.
             pre_load (Union[Dict[str, bool], bool]):
                 A boolean or dictionary that specifies whether to pre-load the dataset into memory before training.
