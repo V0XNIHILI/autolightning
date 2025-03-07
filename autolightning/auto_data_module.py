@@ -17,8 +17,8 @@ from .types import Phase, TransformValue
 from torch_mate.data.utils import Transformed, TransformedIterable, PreLoaded
 
 
-STAGES = ["train", "val", "test", "pred"]
-ALLOWED_DATASET_KEYS = STAGES + ["defaults"]
+PHASES = ["train", "val", "test", "pred"]
+ALLOWED_DATASET_KEYS = PHASES + ["defaults"]
 PRE_LOAD_MOMENT = "pre_load"
 ARGS_KEY = "args"
 
@@ -33,19 +33,34 @@ def instantiate_datasets(dataset: Optional[Union[Dict[str, Dataset], Dict, Datas
     if not isinstance(dataset, dict):
         raise ValueError(f"Unsupported dataset configuration: {dataset}; can either be None, a Dataset instance or a dictionary")
     
-    # If the dictionary has any of the stages, then it is a dictionary of datasets per stage
-    if any(key in dataset for key in STAGES):
-        # Make sure no other keys are present except for the stages
-        assert set(dataset.keys()) - set(STAGES) == set(), f"Unsupported keys in dataset configuration: {set(dataset.keys()) - set(STAGES)}"
-        # Make sure all values are datasets
-        assert all(isinstance(ds, Dataset) for ds in dataset.values()), f"Unsupported values in dataset configuration that are not an instance of a Dataset: {set(type(ds) for ds in dataset.values())}"
+    # If the dictionary has any of the phases, then it is a dictionary of datasets per stage
+    if any(key in dataset for key in PHASES):
+        dataset_dict = {}
 
-        return dataset
+        for key, ds in dataset.items():
+            if key not in PHASES:
+                raise ValueError(f"Unsupported phase key in dataset configuration: {key}")
+            
+            if isinstance(ds, Dataset):
+                dataset_dict[key] = ds
+            elif "class_name" in ds:
+                init = {"class_path": ds["class_name"], "init_args": ds.get(ARGS_KEY, {})}
+
+                if type(init["class_path"]) is str:
+                    dataset_dict[key] = instantiate_class(tuple(), init)
+                else:
+                    dataset_dict[key] = init["class_path"](**init["init_args"])
+
+                dataset_dict[key] = instantiate_class(tuple(), init)
+            else:
+                raise ValueError(f"Unsupported dataset configuration; should be a Dataset instance or a dictionary with a 'class_name' key: {ds}")
+
+        return dataset_dict
     
-    if "class" in dataset:
-        init = {"class_path": dataset["class"]}
+    if "class_name" in dataset:
+        init = {"class_path": dataset["class_name"]}
 
-        # There is this weird bug, where dataset["class"] can be a Namespace object with empty args
+        # There is this weird bug, where dataset["class_name"] can be a Namespace object with empty args
         # if this dictionary is set via a YAML file
         if isinstance(init["class_path"], Namespace):
             init["class_path"] = dict(init["class_path"])["class_path"]
@@ -56,7 +71,6 @@ def instantiate_datasets(dataset: Optional[Union[Dict[str, Dataset], Dict, Datas
             assert set(dataset[ARGS_KEY].keys()) - set(ALLOWED_DATASET_KEYS) == set(), f"Unsupported keys in dataset configuration: {set(dataset['args'].keys()) - set(ALLOWED_DATASET_KEYS)}"
 
             defaults = dataset[ARGS_KEY].get("defaults", {})
-
 
             dataset_dict = {}
 
@@ -208,6 +222,10 @@ class AutoDataModule(L.LightningDataModule):
         self.random_split = random_split
         self.cross_val = cross_val
 
+        # Perform XOR
+        if self.cross_val and self.random_split:
+            raise ValueError("Both random_split and cross_val are specified; only one of them can be used at a time.")
+
         self.seed = seed
 
         self.instantiated_dataset: Union[Dataset, Dict[str, Dataset]] = {}
@@ -228,25 +246,21 @@ class AutoDataModule(L.LightningDataModule):
         if datasets == None:
             return
         
-        relevant_keys = []
+        relevant_phases = []
 
         if stage == 'fit':
-            relevant_keys = ['train', 'val']
+            relevant_phases = ['train', 'val']
         elif stage == 'test':
-            relevant_keys = ['test']
+            relevant_phases = ['test']
         elif stage == 'predict':
-            relevant_keys = ['pred']
+            relevant_phases = ['pred']
         elif stage == 'validate':
-            relevant_keys = ['val']
+            relevant_phases = ['val']
 
         generator = torch.Generator()
 
         if self.seed is not None:
             generator = generator.manual_seed(self.seed)
-
-        # Perform XOR
-        if self.cross_val and self.random_split:
-            warnings.warn("Both random_split and cross_val are specified; only cross_val will be used. Make sure that this is intended behaviour.")
 
         if isinstance(datasets, Dataset):
             if self.cross_val:
@@ -270,20 +284,23 @@ class AutoDataModule(L.LightningDataModule):
                 if not isinstance(self.random_split, dict):
                     raise TypeError(f"Unsupported random split configuration: {self.random_split}; must be a dictionary")
 
-                assert set(self.random_split.keys()) - set(STAGES) == set(), f"Unsupported keys in random split configuration: {set(self.random_split.keys()) - set(STAGES)}"
+                assert set(self.random_split.keys()) - set(PHASES) == set(), f"Unsupported keys in random split configuration: {set(self.random_split.keys()) - set(PHASES)}"
 
                 dataset_splits = torch_random_split(datasets, self.random_split.values(), generator=generator)
                 datasets = dict(zip(self.random_split.keys(), dataset_splits))
 
-                for phase_key in relevant_keys:
+                for phase_key in relevant_phases:
                     self.instantiated_dataset[phase_key] = datasets[phase_key]
             else:
-                for phase_key in relevant_keys:
+                for phase_key in relevant_phases:
+                    if phase_key != 'train':
+                        warnings.warn(f"Only one dataset was specified, but it will be used for multiple phases: {relevant_phases}")
+            
                     self.instantiated_dataset[phase_key] = datasets
         else:
             instantiate_dataset_keys = []
 
-            for phase_key in relevant_keys:
+            for phase_key in relevant_phases:
                 if phase_key in instantiate_dataset_keys:
                     continue
 
@@ -329,7 +346,7 @@ class AutoDataModule(L.LightningDataModule):
                     self.instantiated_dataset[phase_key] = dataset
                     instantiate_dataset_keys.append(phase_key)
 
-    def get_dataset(self, phase: Phase):
+    def get_dataset(self, phase: Phase) -> Union[Dataset, IterableDataset]:
         if phase not in self.instantiated_dataset:
             raise KeyError(f"Dataset for phase {phase} not found; make sure to call `setup` before accessing the dataset")
             
