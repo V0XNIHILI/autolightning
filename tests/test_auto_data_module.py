@@ -46,7 +46,7 @@ def test_mixed_dataloader_kwargs():
 
     data = AutoDataModule(dataloaders=kwargs)
 
-    for stage in STAGES:
+    for stage in PHASES:
         with pytest.raises(Exception):
             data.get_dataloader_kwargs(stage)
 
