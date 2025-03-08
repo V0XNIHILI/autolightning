@@ -108,13 +108,13 @@ def compose_if_list(tf: Optional[TransformValue]) -> Optional[Callable]:
     return tf
 
 
-def build_transform(stage: str, transforms: TransformType) -> (Callable | None):
+def build_transform(phase: str, transforms: TransformType) -> (Callable | None):
     if type(transforms) is not dict:
         return compose_if_list(transforms)
 
     tfs = []
 
-    for key in ["pre", stage, "post"]:
+    for key in ["pre", phase, "post"]:
         if key in transforms:
             tf = compose_if_list(transforms[key])
             tfs.append(tf)
