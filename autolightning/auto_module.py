@@ -82,7 +82,7 @@ class AutoModule(L.LightningModule):
         else:
             yield from params
 
-    def register_optimizer(self, module: nn.Module, optimizer: Optional[OptimizerCallable] = None, lr_scheduler: Optional[LRSchedulerCallable] = None):
+    def register_optimizer(self, module: nn.Module, optimizer: Optional[OptimizerCallable] = None, lr_scheduler: Optional[LrSchedulerType] = None):
         if optimizer != None:
             if module in self.optimizers_schedulers:
                 warnings.warn(f"Optimizer for module '{module}' already exists in optimizers_schedulers. Overwriting it.")
@@ -113,15 +113,45 @@ class AutoModule(L.LightningModule):
                 if scheduler != None:
                     if isinstance(scheduler, optim.lr_scheduler.LRScheduler):
                         schedulers.append(scheduler)
-                    else:
+                    elif callable(scheduler):
                         schedulers.append(scheduler(optimizers[-1]))
+                    elif isinstance(scheduler, dict):
+                        sched = scheduler["scheduler"]
+
+                        if callable(sched):
+                            sched_inst = sched(optimizers[-1])
+                        else:
+                            sched_inst = sched
+
+                        init_sched = {key: value for key, value in scheduler.items() if key != "scheduler"}
+                        init_sched["scheduler"] = sched_inst
+
+                        schedulers.append(init_sched)
+                    else:
+                        raise TypeError(f"Invalid scheduler type: {type(scheduler)}; expected either a scheduler or a callable")
             elif callable(optimizer):
                 params = self.parameters_for_optimizer() if module == self else module.parameters()
                 optimizers.append(optimizer(params))
 
                 if scheduler != None:
-                    schedulers.append(scheduler(optimizers[-1]))
+                    if callable(scheduler):
+                        schedulers.append(scheduler(optimizers[-1]))
+                    elif isinstance(scheduler, dict):
+                        sched = scheduler["scheduler"]
+
+                        assert callable(sched), f"Scheduler for module '{module}' must be a callable"
+
+                        sched_inst = sched(optimizers[-1])
+
+                        init_sched = {key: value for key, value in scheduler.items() if key != "scheduler"}
+                        init_sched["scheduler"] = sched_inst
+
+                        schedulers.append(init_sched)
+                    else:
+                        raise TypeError(f"Invalid scheduler type: {type(scheduler)}; expected a callable")
             elif isinstance(optimizer, (list, tuple)):
+                assert scheduler == None, "Cannot use a list of optimizers with a scheduler"
+
                 if all(isinstance(opt, optim.Optimizer) for opt in optimizer):
                     optimizers.extend(optimizer)
                 elif all(callable(opt) for opt in optimizer):
@@ -135,8 +165,12 @@ class AutoModule(L.LightningModule):
                 else:
                     raise TypeError(f"Invalid optimizer type: {type(optimizer)}")
             elif isinstance(optimizer, dict):
+                assert scheduler == None, "Cannot use a dict of optimizers with a scheduler"
+
                 if isinstance(module, nn.ModuleDict):
                     for key in optimizer:
+                        assert callable(optimizer[key]), f"Optimizer for key '{key}' must be a callable"
+
                         optimizers.append(optimizer[key](module[key].parameters()))
                 else:
                     raise ValueError(f"Cannot use optimizer dict with non-ModuleDict module: {module}")
@@ -209,6 +243,7 @@ class AutoModule(L.LightningModule):
         # - a tuple/iterable, all values of which will be fed into the loss function
         #   and that can be used for metric computation
         # - a dictionary with two keys: "loss" and (optionally) "metrics"
+        # - a dictionary with two keys: "criterion_args" and (optionally) "metrics"
         # - a torch tensor (the loss was already computed)
         # - None
         step_out = self.shared_step(phase, *args, **kwargs)

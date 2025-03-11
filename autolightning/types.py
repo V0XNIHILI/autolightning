@@ -14,7 +14,7 @@ from lightning.pytorch.cli import OptimizerCallable, LRSchedulerCallable
 
 MetricType = Dict[str, Union[Metric, Callable[..., Any]]]
 OptimizerType = Union[Optimizer, OptimizerCallable, Iterable[Union[Optimizer, OptimizerCallable]], Dict[str, OptimizerCallable]]
-LrSchedulerType = Union[LRSchedulerCallable, ]
+LrSchedulerType = Union[LRSchedulerCallable, Dict]
 IterableOfModules = Iterable[nn.Module]
 
 CallableOrModule = Union[Callable, nn.Module]
