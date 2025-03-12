@@ -89,8 +89,8 @@ def dummy_criterion():
     return DummyCriterion()
 
 
-# Tests
 def test_net_only():
+    """Tests that AutoModule correctly assigns a net and parameters are properly accessible."""
     nets = [None, DummyNet()]
     for net in nets:
         module = AutoModule(net=net)
@@ -101,6 +101,7 @@ def test_net_only():
 
 
 def test_parameters_for_optimizer(dummy_net):
+    """Tests that parameters_for_optimizer correctly filters parameters based on exclude_no_grad flag."""
     # Set all parameters to not require grad
     for param in dummy_net.parameters():
         param.requires_grad = False
@@ -114,11 +115,13 @@ def test_parameters_for_optimizer(dummy_net):
 
 
 def test_register_none_optimizer(dummy_module):
+    """Tests that module initializes with empty optimizers_schedulers and returns None from configure_optimizers."""
     assert dummy_module.optimizers_schedulers == {}
     assert dummy_module.configure_optimizers() is None
 
 
 def test_register_optimizer(dummy_net, dummy_module):
+    """Tests registering an optimizer instance and verifies it's correctly configured."""
     dummy_module.register_optimizer(dummy_net, optim.SGD(dummy_net.parameters(), lr=0.1))
 
     assert isinstance(dummy_module.optimizers_schedulers[dummy_net][0], optim.SGD)
@@ -129,6 +132,7 @@ def test_register_optimizer(dummy_net, dummy_module):
 
 
 def test_register_callable_optimizer(dummy_net, dummy_optimizer_callable, dummy_module):
+    """Tests registering a callable optimizer and verifies it's correctly instantiated with parameters."""
     dummy_module.register_optimizer(dummy_net, dummy_optimizer_callable)
 
     assert callable(dummy_module.optimizers_schedulers[dummy_net][0])
@@ -141,6 +145,7 @@ def test_register_callable_optimizer(dummy_net, dummy_optimizer_callable, dummy_
 
 
 def test_register_optimizer_scheduler(dummy_net, dummy_module):
+    """Tests registering an optimizer with scheduler instances and verifies they're correctly configured."""
     optimizer = optim.SGD(dummy_net.parameters(), lr=0.1)
     scheduler = StepLR(optimizer, step_size=1)
     dummy_module.register_optimizer(dummy_net, optimizer, scheduler)
@@ -154,6 +159,7 @@ def test_register_optimizer_scheduler(dummy_net, dummy_module):
 
 
 def test_register_optimizer_scheduler_callables(dummy_net, dummy_optimizer_callable, dummy_lr_scheduler_callable, dummy_module):
+    """Tests registering callable optimizer and scheduler and verifies they're correctly instantiated."""
     dummy_module.register_optimizer(dummy_net, dummy_optimizer_callable, dummy_lr_scheduler_callable)
 
     assert callable(dummy_module.optimizers_schedulers[dummy_net][0])
@@ -165,6 +171,7 @@ def test_register_optimizer_scheduler_callables(dummy_net, dummy_optimizer_calla
 
 
 def test_register_optimizer_callable_scheduler(dummy_net, dummy_lr_scheduler_callable, dummy_module):
+    """Tests registering an optimizer instance with callable scheduler and verifies they're correctly configured."""
     optimizer = optim.SGD(dummy_net.parameters(), lr=0.1)
     dummy_module.register_optimizer(dummy_net, optimizer, dummy_lr_scheduler_callable)
 
@@ -177,6 +184,7 @@ def test_register_optimizer_callable_scheduler(dummy_net, dummy_lr_scheduler_cal
 
 
 def test_optimizer_with_scheduler_dict_callable(dummy_net, dummy_criterion):
+    """Tests using an optimizer with a scheduler dictionary containing a callable and additional parameters."""
     optimizer = optim.SGD(dummy_net.parameters(), lr=0.1)
     scheduler = {
         "scheduler": lambda opt: optim.lr_scheduler.StepLR(opt, step_size=10, gamma=0.1),
@@ -196,6 +204,7 @@ def test_optimizer_with_scheduler_dict_callable(dummy_net, dummy_criterion):
 
 
 def test_callable_optimizer_with_scheduler_dict_callable(dummy_net, dummy_criterion):
+    """Tests using a callable optimizer with a scheduler dictionary containing a callable and additional parameters."""
     optimizer = lambda params: optim.SGD(params, lr=0.1)
     scheduler = {
         "scheduler": lambda opt: optim.lr_scheduler.StepLR(opt, step_size=10, gamma=0.1),
@@ -217,6 +226,7 @@ def test_callable_optimizer_with_scheduler_dict_callable(dummy_net, dummy_criter
 
 
 def test_optimizer_with_scheduler_dict(dummy_net, dummy_criterion):
+    """Tests using an optimizer instance with a scheduler instance and verifies they're correctly configured."""
     optimizer = optim.SGD(dummy_net.parameters(), lr=0.1)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
     
@@ -229,9 +239,8 @@ def test_optimizer_with_scheduler_dict(dummy_net, dummy_criterion):
     assert isinstance(result["lr_scheduler"], optim.lr_scheduler.StepLR)
 
 
-# New tests extending the existing ones
 def test_optimizer_list_instances(dummy_net, dummy_criterion):
-    """Test with a list of optimizer instances."""
+    """Tests using a list of optimizer instances and verifies they're all properly passed through configure_optimizers."""
     optimizer1 = optim.SGD([param for name, param in dummy_net.named_parameters() if "bias" in name], lr=0.01)
     optimizer2 = optim.Adam([param for name, param in dummy_net.named_parameters() if "bias" not in name], lr=0.001)
     
@@ -246,7 +255,7 @@ def test_optimizer_list_instances(dummy_net, dummy_criterion):
 
 
 def test_optimizer_list_callables(dummy_net, dummy_criterion):
-    """Test with a list of optimizer callables."""
+    """Tests using a list of optimizer callables and verifies they're instantiated with the correct parameters."""
     optimizer = [
         lambda params: optim.SGD(params, lr=0.01),
         lambda params: optim.Adam(params, lr=0.001)
@@ -267,7 +276,7 @@ def test_optimizer_list_callables(dummy_net, dummy_criterion):
 
 
 def test_optimizer_list_callables_with_module_list(dummy_module_list, dummy_criterion):
-    """Test with a list of optimizer callables with a ModuleList."""
+    """Tests using a list of optimizer callables with a ModuleList and verifies each optimizer is paired with its respective module."""
     optimizer = [
         lambda params: optim.SGD(params, lr=0.01),
         lambda params: optim.Adam(params, lr=0.001)
@@ -289,7 +298,7 @@ def test_optimizer_list_callables_with_module_list(dummy_module_list, dummy_crit
 
 
 def test_optimizer_dict_with_moduledict(dummy_module_dict, dummy_criterion):
-    """Test with a dictionary of optimizers and a ModuleDict."""
+    """Tests using a dictionary of optimizer callables with a ModuleDict and verifies each optimizer is paired with its respective module."""
     optimizer = {
         'encoder': lambda params: optim.SGD(params, lr=0.01),
         'decoder': lambda params: optim.Adam(params, lr=0.001)
@@ -311,7 +320,7 @@ def test_optimizer_dict_with_moduledict(dummy_module_dict, dummy_criterion):
 
 
 def test_optimizer_dict_with_non_moduledict(dummy_net, dummy_criterion):
-    """Test with a dictionary of optimizers and a non-ModuleDict (should raise an error)."""
+    """Tests that using a dictionary of optimizers with a non-ModuleDict module raises the expected error."""
     optimizer = {
         'layer1': lambda params: optim.SGD(params, lr=0.01),
         'layer2': lambda params: optim.Adam(params, lr=0.001)
@@ -325,7 +334,7 @@ def test_optimizer_dict_with_non_moduledict(dummy_net, dummy_criterion):
 
 
 def test_list_optimizers_with_scheduler(dummy_net, dummy_criterion, dummy_lr_scheduler_callable):
-    """Test with a list of optimizers and a scheduler (should raise an error)."""
+    """Tests that using a list of optimizers with a scheduler raises the expected assertion error."""
     optimizer = [
         lambda params: optim.SGD(params, lr=0.01),
         lambda params: optim.Adam(params, lr=0.001)
@@ -340,7 +349,7 @@ def test_list_optimizers_with_scheduler(dummy_net, dummy_criterion, dummy_lr_sch
 
 
 def test_dict_optimizers_with_scheduler(dummy_module_dict, dummy_criterion, dummy_lr_scheduler_callable):
-    """Test with a dict of optimizers and a scheduler (should raise an error)."""
+    """Tests that using a dictionary of optimizers with a scheduler raises the expected assertion error."""
     optimizer = {
         'encoder': lambda params: optim.SGD(params, lr=0.01),
         'decoder': lambda params: optim.Adam(params, lr=0.001)
@@ -355,7 +364,7 @@ def test_dict_optimizers_with_scheduler(dummy_module_dict, dummy_criterion, dumm
 
 
 def test_multiple_optimizers_and_schedulers(dummy_module_dict, dummy_criterion):
-    """Test with multiple optimizers and schedulers."""
+    """Tests registering multiple optimizers with their respective schedulers and verifies they're correctly paired in the output."""
     module = AutoModule(criterion=dummy_criterion, net=dummy_module_dict)
 
     # Register optimizers and schedulers for encoder and decoder
@@ -387,7 +396,7 @@ def test_multiple_optimizers_and_schedulers(dummy_module_dict, dummy_criterion):
 
 
 def test_invalid_optimizer_type(dummy_net, dummy_criterion):
-    """Test with an invalid optimizer type."""
+    """Tests that registering an invalid optimizer type raises the expected TypeError."""
     module = AutoModule(net=dummy_net, criterion=dummy_criterion)
     
     module.register_optimizer(dummy_net, "invalid_optimizer")
@@ -397,13 +406,13 @@ def test_invalid_optimizer_type(dummy_net, dummy_criterion):
 
 
 def test_scheduler_without_optimizer(dummy_net, dummy_criterion, dummy_lr_scheduler_callable):
-    """Test with a scheduler but no optimizer."""
+    """Tests that attempting to register a scheduler without an optimizer raises the expected ValueError."""
     with pytest.raises(ValueError, match="Cannot register a scheduler when the optimizer is None"):
         AutoModule(net=dummy_net, criterion=dummy_criterion, lr_scheduler=dummy_lr_scheduler_callable)
 
 
 def test_invalid_scheduler_type(dummy_net, dummy_criterion):
-    """Test with an invalid scheduler type."""
+    """Tests that registering an invalid scheduler type raises the expected TypeError."""
     optimizer = optim.SGD(dummy_net.parameters(), lr=0.1)
     
     module = AutoModule(net=dummy_net, criterion=dummy_criterion)
