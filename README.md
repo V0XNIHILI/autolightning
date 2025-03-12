@@ -2,31 +2,31 @@
 
 **The authors of this project would like to thank the [Lightning](https://lightning.ai/) team for their amazing work on [PyTorch Lightning](https://github.com/Lightning-AI/pytorch-lightning), which this project is fully based on.**
 
-The goal of this project is to achieve zero-code, from-configuration-only training of PyTorch models using PyTorch Lightning. This is achieved by using a configuration dictionary that specifies the model, the dataset, the data loaders, etc. The configuration is then used to build all required objects. Currently, this leads to an average lines-of-code reduction of 15% compared to a standard PyTorch Lightning, while improving customizability + reproducibility and maintaining the same flexibility as the original code.
+## Overview
 
-## Key features
+`autolightning` provides a zero-code, configuration-driven approach to training PyTorch models using PyTorch Lightning. By specifying models, datasets, transforms, optimizers, and more through configuration dictionaries, you can significantly reduce boilerplate code while maintaining flexibility, improving reproducibility, and enhancing customization options.
 
-- [Standardized pre-made training methods](#standardized-pre-made-training-methods)
-- [Built-in datasets](#built-in-datasets)
-- Sweeps
-- K-fold cross-validation
-- Customization hooks
-- Custom CLI (`autolightning` command)
-- Fully from-configuration-only training
-- Support for setting most torch flags from the CLI
-- Very detailed hyperparameter logging to be data-driven
-- Full transform pipeline (including batch transforms)
+Current benchmarks show an average **15% reduction in lines of code** compared to standard PyTorch Lightning implementations, without compromising functionality.
+
+## Key Features
+
+- **Config-driven model training**: Train models with minimal code using YAML, Python dictionaries, or Python files
+- **Comprehensive transform pipelines**: Full support for data transformations including batch transforms
+- **Experiment management**: Seamless integration with WandB and other logging tools
+- **Hyperparameter optimization**: Support for WandB sweeps, Ray Tune, and Optuna
+- **Standardized training methods**: Pre-made modules for supervised learning, self-supervised learning, knowledge distillation, and more
+- **Built-in dataset support**: Simplified access to common datasets with customizable transforms
+- **K-fold cross-validation**: Easy implementation of cross-validation strategies
+- **Custom CLI**: Enhanced autolightning command supporting all PyTorch Lightning features plus additional torch flags
 
 ## Installation
 
-To install the package, you can use the following command:
-
+Standard installation:
 ```bash
 pip install git+https://github.com/V0XNIHILI/autolightning.git@main
 ```
 
-Or, if you want to install the package in editable mode, you can use the following command:
-
+Development installation:
 ```bash
 git clone git@github.com:V0XNIHILI/autolightning.git
 cd autolightning
@@ -34,11 +34,9 @@ cd autolightning
 pip install -e .
 ```
 
-## Example usage of `autolightning`: supervised learning on MNIST
+## Quick Start: Supervised Learning on MNIST
 
-### In a notebook or script
-
-To run supervised learning on MNIST, with a simple FC layer, the following code is all you need:
+### Using Python Code
 
 ```python
 from autolightning.lm import Classifier
@@ -46,50 +44,37 @@ from autolightning.datasets import MNIST
 
 import torch
 import torch.nn as nn
-
 from torchvision import transforms
+from torchvision.ops import MLP
 
-net = nn.Linear(28*28, 10)
+# Define model
+net = MLP(784, [100, 10])
 
+# Create classifier with optimizer
 model = Classifier(
     net=net, 
-    optimizer=torch.optim.Adam(net.parameters(), lr=0.003)
+    optimizer=torch.optim.Adam(net.parameters(), lr=1e-3)
 )
 
+# Create data module with transforms
 data = MNIST(
     root="data",
     dataloaders=dict(batch_size=128),
     transforms=[transforms.ToTensor(), nn.Flatten(start_dim=0)]
 )
-```
 
-Then train using the same PyTorch Lightning trainer that you were used to:
-
-```python
+# Train with standard Lightning trainer
 from lightning.pytorch import Trainer
 
-trainer = Trainer(
-    max_epochs=10
-)
-
+trainer = Trainer(max_epochs=10)
 trainer.fit(model, data)
 ```
 
-### From the CLI (based on PyTorch Lightning CLI)
+### Using Configuration (YAML)
 
-Note that the `autolightning` CLI tool supports all the same arguments as the regular PyTorch Lightning CLI (the `AutoCLI` is a subclass of the `LightningCLI`) but allows for two key differences:
-
-1. Configurations can also be specified as Python files (instead of in YAML files)
-2. The AutoCLI has additional `torch` flags that can be set in a configuration file to configure the PyTorch backend regarding debugging and performance.
-!!!!!!! wandb flags
-3. By default, the CLI only allows subclasses of `AutoModule` and `AutoDataModule` to be used as Lightning modules.
-
-To train an MLP on MNIST, you can write a YAML configuration file like the following:
+Create a `config.yaml`:
 
 ```yaml
-# filename: config.yaml
-# --------------------
-
 model:
   class_path: autolightning.lm.Classifier
   init_args:
@@ -110,108 +95,217 @@ data:
           init_args:
             start_dim: 0
     dataloaders:
-      defaults:
-        batch_size: 1024
-      train:
-        shuffle: true
-      val:
-        drop_last: false
+      batch_size: 128
 optimizer:
   class_path: torch.optim.Adam
   init_args:
     lr: 1e-3
 seed_everything: 437952406
 trainer:
-  check_val_every_n_epoch: 10
-  max_epochs: 100
-  accelerator: cpu
-  logger:
-    - class_path: autolightning.loggers.AutoWandbLogger
-      init_args:
-        project: name_of_your_wandb_project
+  max_epochs: 10
 ```
 
-Then, to add the additional torch flags, you can append the following to the configuration file:
+To add PyTorch performance optimizations, append:
 
 ```yaml
 torch:
   autograd:
-    set_detect_anomaly: False
+    set_detect_anomaly: false
     profiler:
-    profile: False
-    emit_nvtx: False
+      profile: false
+      emit_nvtx: false
   set_float32_matmul_precision: high
-backends:
-  cuda:
-  matmul:
-    allow_tf32: True
-  cudnn:
-  allow_tf32: True
-  benchmark: True
+  backends:
+    cuda:
+      matmul:
+        allow_tf32: true
+    cudnn:
+      allow_tf32: true
+      benchmark: true
 wandb:
   watch:
-    enable: true # To track gradients and parameters while training
+    enable: true  # Track gradients and parameters during training
 ```
 
-To run training on the configuration file, you can use the following command:
-
-!!!!! note device that should be selected
+Run training with:
 
 ```bash
 autolightning fit -c config.yaml
 ```
 
-!!! add note that all hyperparameters will be logged this way!!
-That is really all there is too it!
+All hyperparameters will be automatically logged to your selected logger.
 
----
+## Advanced Features
 
-## Standardized pre-made training methods
+### Transform Pipeline
 
-### Supervised learning
+`autolightning` provides a comprehensive transform pipeline that supports:
 
-* Regular supervised learning ([`Supervised`](./autolightning/lm/supervised.py))
-* Classification ([`Classifier`](./autolightning/lm/classifier.py))
+- **Dataset transforms**: Applied when loading the dataset
+- **Pre-load transforms**: Applied before dataset is loaded into memory
+- **Phase-specific transforms**: Different transforms for train/val/test splits
+- **Batch transforms**: Applied during batch transfer to/from device
 
-### Self-supervised learning
+Example:
 
-* Siamese networks ([`Siamese`](./autolightning/lm/self_supervised.py))
-* Triplet networks ([`Triplet`](./autolightning/lm/self_supervised.py))
+```python
+data = AutoDataModule(
+    dataset=CIFAR10("data", train=True, download=True),
+    transforms={
+        "pre_load": SimpleTransform(1),  # Applied before loading to memory
+        "pre": [Transform1(), Transform2()],  # Applied before phase transform
+        "train": TrainTransform(),  # Only applied to training data
+        "val": ValTransform(),  # Only applied to validation data
+        "post": PostTransform()  # Applied after phase transform
+    },
+    target_transforms={
+        "train": LabelTransform(),
+        "val": LabelTransform()
+    },
+    batch_transforms={
+        "before": BatchTransformBeforeGPU(),
+        "after": BatchTransformAfterGPU()
+    },
+    pre_load=True  # Enable pre-loading
+)
+```
 
-### Knowledge distillation
+### Cross-Validation
 
-* Knowledge distillation supporting an optional student head and a student regressor net ([`Distilled`](./autolightning/lm/distillation.py)), useful distillation losses provided in [`distillation_losses.py`](autolightning/nn/distillation_losses.py)
+K-fold cross-validation can be easily implemented:
 
-### Quantization-aware training (QAT)
+```python
+from autolightning.lm import Classifier
+from autolightning.datasets import MNIST
 
-* Performing QAT with [Brevitas](https://github.com/Xilinx/brevitas) ([`BrevitasSupervised`, `BrevitasClassifier`, `BrevitasPrototypical`](./autolightning/lm/qat.py))
+n_splits = 5
 
-### Few-shot learning
+data = lambda i: MNIST(
+    root="data",
+    dataloaders=dict(batch_size=128),
+    transforms=[transforms.ToTensor(), nn.Flatten(start_dim=0)],
+    # Specify the cross validation setup
+    cross_val=dict(n_splits=n_splits, fold=i)
+)
 
-* Prototypical learning ([`Prototypical`](./autolightning/lm/prototypical.py))
+for fold_idx in range(n_splits):
+    net = nn.Linear(28*28, 10)
+    model = Classifier(
+        net=net, 
+        optimizer=torch.optim.Adam(net.parameters(), lr=0.003)
+    )
+    trainer = Trainer(max_epochs=2)
+    trainer.fit(model, data(fold_idx))
+```
 
-### Continual learning
+In configuration:
+```yaml
+data:
+  class_path: autolightning.datasets.MNIST
+  init_args:
+    cross_val:
+      n_splits: 5
+      fold: 0
+```
 
-Work in progress!
+### Random Split
 
-### In-context learning
+Split a dataset into train/val/test with specified ratios:
 
-Work in progress!
+```yaml
+data:
+  class_path: autolightning.datasets.CIFAR10
+  init_args:
+    random_split:
+      train: 0.7
+      val: 0.2
+      test: 0.1
+    seed: 42  # For reproducibility
+```
 
-## Built-in datasets
+### Hyperparameter Sweeps
 
-* Included by default are:
-  * [`MNIST`](./autolightning/datasets.py)
-  * [`CIFAR10`](./autolightning/datasets.py)
-  * [`FashionMNIST`](./autolightning/datasets.py)
-* Any dataset that has the initialization call signature `(root: str, download: bool, train: bool)` can be used via [`RootDownloadTrain`](./autolightning/datasets.py)
-* Convert any labeled dataset to a few-shot dataset using [`FewShot` and `FewShotMixin`](./autolightning/dm/few_shot.py)
+#### Using Weights & Biases
 
-## Model loading options
+```python
+sweep_configuration = {
+    'method': 'grid',
+    'name': 'Example Sweep',
+    'command': ['python', '${program}', '--config', yaml_conf, '${args_no_hyphens}'],
+    'program': "autolightning",
+    'parameters': {
+        'model.init_args.learning_rate': {
+            'values': [0.001, 0.01, 0.1]
+        }
+    },
+    'metric': {
+        'name': 'val_loss',
+        'goal': 'minimize'
+    }
+}
+```
 
-Alternatively, you can also load a pre-trained model from a state dict, compile a model or disable gradients for a module:
+Use the AutoWandbLogger in your configuration to track results.
 
-#### Loading a pre-trained model
+#### Using Ray Tune or Optuna
+
+Supported through configuration hooks:
+
+```python
+from ray import tune
+from autolightning import auto_main
+
+def tune_function(config):
+    # Inject config parameters
+    my_config = {...}  # Your base config
+    my_config["model"]["init_args"]["learning_rate"] = config["learning_rate"]
+    
+    # Run training
+    auto_main(config=my_config, subcommand="fit")
+
+# Define search space
+search_space = {
+    "learning_rate": tune.loguniform(1e-4, 1e-1)
+}
+
+# Run hyperparameter search
+analysis = tune.run(tune_function, config=search_space)
+```
+
+## Pre-made Training Methods
+
+### Supervised Learning
+- **`Supervised`**: General supervised learning
+- **`Classifier`**: Classification tasks
+
+### Self-supervised Learning
+- **`Siamese`**: Siamese networks for similarity learning
+- **`Triplet`**: Triplet networks for ranking tasks
+
+### Knowledge Distillation
+- **`Distilled`**: Knowledge distillation with optional student head and regressor
+
+### Quantization-aware Training
+- **[`BrevitasSupervised`, `BrevitasClassifier`, `BrevitasPrototypical`](./autolightning/lm/qat.py)**: QAT with Brevitas
+
+### Few-shot Learning
+- **`Prototypical`**: Prototypical networks for few-shot learning
+
+### Coming Soon
+- **Continual Learning**: Stay tuned!
+- **In-context Learning**: Under development
+
+## Built-in Datasets
+
+- **`MNIST`**: The classic handwritten digit dataset
+- **`CIFAR10`**: 10-class image classification dataset
+- **`FashionMNIST`**: Fashion items classification
+- **`RootDownloadTrain`**: Wrapper for datasets with (root, download, train) parameters
+- **[`FewShot` and `FewShotMixin`](./autolightning/dm/few_shot.py)**: Convert datasets to few-shot learning format
+
+## Model Loading and Modification
+
+### Loading Pre-trained Models
 
 ```yaml
 model:
@@ -226,10 +320,9 @@ model:
             init_args:
                 in_channels: 784
                 hidden_channels: [100, 10]
-...
 ```
 
-#### Compiling a model
+### Compiling Models
 
 ```yaml
 model:
@@ -244,10 +337,9 @@ model:
             init_args:
                 in_channels: 784
                 hidden_channels: [100, 10]
-...
 ```
 
-#### Disabling gradients
+### Freezing Model Parameters
 
 ```yaml
 model:
@@ -261,199 +353,121 @@ model:
             init_args:
                 in_channels: 784
                 hidden_channels: [100, 10]
-...
 ```
 
-### Best practices
+## Best Practices
 
-You can also split hyperparameter configuration from per-machine specific configuration by moving the latter into a separate (YAML) config file, for example:
+### Separating Configuration
 
+Split your configuration into hyperparameters and machine-specific settings:
+
+**main.yaml** (hyperparameters):
 ```yaml
-# filename: local.yaml
-# --------------------
+model:
+  class_path: autolightning.lm.Classifier
+  init_args:
+    net:
+        class_path: torchvision.ops.MLP
+        init_args:
+            in_channels: 784
+            hidden_channels: [100, 10]
+```
 
+**local.yaml** (machine-specific):
+```yaml
 data:
-  # Don't forget to remove these keys from main.py!
   root: "../datasets/data"
   download: True
 trainer:
-  logger:
-    - class_path: WandbLogger
-      init_args:
-        project: name_of_wandb_project
-        log_model: true
-  callbacks:
-    - class_path: ModelCheckpoint
-      init_args:
-        monitor: val/accuracy
-        mode: max
-        save_on_train_epoch_end: false
-        save_top_k: 1
   accelerator: gpu
-  check_val_every_n_epoch: 10
   devices: [3]
 ```
 
-To run training on the combined configuration (where the values in `main.py` are hyperparameters and the values in `local.yaml` are machine-specific):
-
+Run with combined configuration:
 ```bash
-autolightning fit -c main.py  -c local.yaml
+autolightning fit -c main.yaml -c local.yaml
 ```
-
-## Data loading options
-
-### K-fold cross-validation
-
-See the following example for how to use k-fold cross-validation in `autolightning`:
-
-```python
-from autolightning.lm import Classifier
-from autolightning.datasets import MNIST
-
-import torch
-import torch.nn as nn
-
-from torchvision import transforms
-
-n_splits = 5
-
-data = lambda i: MNIST(
-    root="data",
-    dataloaders=dict(batch_size=128),
-    transforms=[transforms.ToTensor(), nn.Flatten(start_dim=0)],
-    # Specify the cross validation setup
-    cross_val=dict(n_splits=n_splits, fold=i)
-)
-
-for fold_idx in range(n_splits):
-    net = nn.Linear(28*28, 10)
-
-    model = Classifier(
-        net=net, 
-        optimizer=torch.optim.Adam(net.parameters(), lr=0.003)
-    )
-
-    trainer = Trainer(max_epochs=2)
-
-    trainer.fit(model, data(fold_idx))
-```
-
-!!! cli demo!!!
-
-### Random split
-
-!!! explain
-
-## Sweeps
-
-### Using `wandb`
-
-```python
-sweep_configuration = {
-        'method': 'grid',
-        'name': 'Bipartite',
-        'command': ['python', '${program}', '--config', yaml_conf, '--eval-only', '${args_no_hyphens}'],
-        'program': f"autolightning",
-        'description': '',
-        'parameters': {
-            'MODEL.X': {
-                'value': 'y'
-            }
-        }
-    }
-  metric:
-  name: val_loss
-  goal: minimize
-```
-
-Per: https://community.wandb.ai/t/separate-args-no-hyphens-keys-and-values-with-whitespace-instead-of-equal-sign/5675
-
-use wandb logger as well
-
-### Using Ray Tune
-
-Use hook from ray tune and use config dict injector
-
-### Optuna
-
-if calling a separate process, need to have a known storage directory and csv logger IMO
-
-### General
-
-Use main() but adapt before_instantiate_classes hook to inject the config dict from the sweep and return the output of the main function
-
-## Advanced use cases
-
-!!!! running from a config file in a Python script manually, or not run and just init
 
 ## Customization
 
-### For models
+### Model Hooks
 
-#### Hooks overview
+autolightning adds several hooks to the standard Lightning model:
 
-In case you want to add or override behavior of the defaults selected by autolightning, this can be done by using hooks. autolightning adds a few new hooks, next to the ones provided by PyTorch Lightning:
+- **`parameters_for_optimizer(self, recurse: bool = True)`**: Control which parameters are used for optimization
+- **`register_optimizer(self, module: nn.Module, optimizer, lr_scheduler)`**: Register optimizers and schedulers
+- **`register_metric(self, name: str, metric)`**: Register evaluation metrics
+- **`shared_step(self, phase: Phase, *args, **kwargs)`**: Core step function for all phases
+- **`shared_logged_step(self, phase: Phase, *args: Any, **kwargs: Any)`**: Logging-aware step function
 
-- `parameters_for_optimizer(self, recurse: bool = True)`
-    - Return the parameters that should be used for the optimizer.
-- `register_optimizer(self, module: nn.Module, optimizer: Optional[OptimizerCallable] = None, lr_scheduler: Optional[LRSchedulerCallable] = None)`
-    - Register the optimizer and learning rate scheduler that should be used.
-- `register_metric(self, name: str, metric: MetricType)`
-    - Register a metric that should be used.
-- `register_metrics(self, metrics: Dict[str, MetricType])`
-    - Register multiple metrics that should be used.
-- `enable_prog_bar(self, phase: Phase)`
-    - Return whether the progress bar should be enabled.
-- `shared_step(self, phase: Phase, *args, **kwargs)`
-    - Function that is called by `shared_logged_step(...)` from the `AutoModule` with the fitting phase argument (`train`/`val`/`test`/`predict`)
-- `shared_logged_step(self, phase: Phase, *args: Any, **kwargs: Any):` 
-    - Function that is called by `training_step(...)`, `validation_step(...)`,  `test_step(...)` and `predict_step(...)` from the`AutoModule` with the fitting phase argument (`train`/`val`/`test`/`predict`)
-
-#### Example hook usage
-
+Example custom model:
 ```python
 import torch.nn as nn
-
 from autolightning import AutoModule
 
 class MyModel(AutoModule):
-    def shared_step(self, batch, batch_idx, phase: str):
+    def shared_step(self, phase, batch, batch_idx):
         X, y = batch
-
         loss = self.criterion(self.net(X), y)
-
         return loss
 ```
 
-### For data
+### Data Module Hooks
 
-#### Hooks overview
+Customize data loading with the following hooks:
 
-Similar to models, you can customize the data loading behavior by using hooks. autolightning adds the following new hooks:
+- **`get_transform(self, stage: str)`**: Get the transform for a specific stage
+- **`get_target_transform(self, stage: str)`**: Get the target transform for a specific stage
+- **`get_dataset(self, phase: Phase)`**: Get the dataset for a specific phase
+- **`get_transformed_dataset(self, phase: Phase)`**: Get the transformed dataset
+- **`get_dataloader(self, phase: Phase)`**: Get the dataloader for a specific phase
 
-- `get_transform(self, stage: str)`
-    - Return the transform that should be used for the given stage.
-- `get_target_transform(self, stage: str)`
-    - Return the target transform that should be used for the given stage.
-- `get_dataset(self, phase: Phase)`
-    - Return the dataset that should be used for the given phase.
-- `get_transformed_dataset(self, phase: Phase)`
-    - Return the dataset that should be used for the given phase, after applying the transforms.
-- `get_dataloader(self, phase: Phase)`
-    - Return the dataloader that should be used for the given phase.
-
-#### Example hook usage
-
+Example custom data module:
 ```python
-import torch.nn as nn
-
 from autolightning import AutoDataModule
 
 class MyDataModule(AutoDataModule):
     def get_dataset(self, phase):
-        # Can put any logic here and can access the configuration
-        # via self.hparams
         return MyDataset(train=phase == 'train')
+```
+
+## Advanced Usage
+
+### Running from a Config File in a Script
+
+```python
+from autolightning.main import auto_main
+
+# Load config from files
+trainer, model, datamodule = auto_main(
+    config=["config.yaml", "local.yaml"],
+    subcommand="fit",
+    run=True  # Set to False to just initialize without running
+)
+
+# Or directly from a dictionary
+config = {
+    "model": {...},
+    "data": {...},
+    "trainer": {...}
+}
+
+trainer, model, datamodule = auto_main(
+    config=config,
+    subcommand="fit",
+    run=True
+)
+```
+
+### Loading Just the Data Module
+
+```python
+from autolightning.main import auto_data
+
+# Load and initialize just the data module
+datamodule = auto_data(
+    config={"class_path": "autolightning.datasets.MNIST", "init_args": {...}}
+)
 ```
 
 ---
