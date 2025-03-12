@@ -135,7 +135,7 @@ autolightning fit -c config.yaml
 
 All hyperparameters will be automatically logged to your selected logger.
 
-## Advanced Features
+## Key Features in Detail
 
 ### Transform Pipeline
 
@@ -248,7 +248,7 @@ sweep_configuration = {
 }
 ```
 
-Use the AutoWandbLogger in your configuration to track results.
+Use the `AutoWandbLogger` in your configuration to track results.
 
 #### Using Ray Tune or Optuna
 
@@ -370,10 +370,10 @@ model:
   class_path: autolightning.lm.Classifier
   init_args:
     net:
-        class_path: torchvision.ops.MLP
-        init_args:
-            in_channels: 784
-            hidden_channels: [100, 10]
+      class_path: torchvision.ops.MLP
+      init_args:
+          in_channels: 784
+          hidden_channels: [100, 10]
 ```
 
 **local.yaml** (machine-specific):
@@ -439,26 +439,33 @@ class MyDataModule(AutoDataModule):
 ### Running from a Config File in a Script
 
 ```python
+import yaml
 from autolightning.main import auto_main
 
-# Load config from files
-trainer, model, datamodule = auto_main(
-    config=["config.yaml", "local.yaml"],
-    subcommand="fit",
-    run=True  # Set to False to just initialize without running
+with open("config.yaml", "r") as f:
+    config = yaml.safe_load(f)
+
+auto_main(
+  # Load config from one or more files
+  config=config, # Can be a list of dictionaries
+  subcommand="fit"
 )
 
-# Or directly from a dictionary
-config = {
-    "model": {...},
-    "data": {...},
-    "trainer": {...}
-}
+```
 
+### Intantiating the Model, Trainer and Data Module
+
+```python
+import yaml
+from autolightning.main import auto_main
+
+with open("config.yaml", "r") as f:
+    config = yaml.safe_load(f)
+
+# Load config from one or more files
 trainer, model, datamodule = auto_main(
     config=config,
-    subcommand="fit",
-    run=True
+    run=False 
 )
 ```
 
