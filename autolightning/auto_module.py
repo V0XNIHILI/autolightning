@@ -195,13 +195,7 @@ class AutoModule(L.LightningModule):
             return {"optimizer": optimizers[0], "lr_scheduler": schedulers[0]}
 
         return optimizers, schedulers
-    
-    def optimizers_dict(self, use_pl_optimizer: bool = True):
-        opts = self.optimizers(use_pl_optimizer)
 
-    def lr_schedulers_dict(self):
-        scheds = self.lr_schedulers()
-    
     def register_metric(self, name: str, metric: MetricType):
         if name in self.metrics:
             warnings.warn(f"Metric '{name}' already exists in metrics. Overwriting it.")
@@ -212,7 +206,7 @@ class AutoModule(L.LightningModule):
        for name, metric in metrics.items():
            self.register_metric(name, metric)
 
-    def enable_prog_bar(self, phase: Phase):
+    def should_enable_prog_bar(self, phase: Phase):
         if self.disable_prog_bar:
             return False
 
@@ -267,7 +261,7 @@ class AutoModule(L.LightningModule):
         else:
             loss = step_out
 
-        prog_bar = self.enable_prog_bar(phase)
+        prog_bar = self.should_enable_prog_bar(phase)
         main_log_kwargs = dict(prog_bar = prog_bar) | log_kwargs
 
         if self.loss_log_key != None and loss != None:
