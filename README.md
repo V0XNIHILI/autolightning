@@ -105,7 +105,7 @@ trainer:
   max_epochs: 10
 ```
 
-To add PyTorch performance optimizations, append:
+To enable PyTorch performance optimizations or model watching with Weights & Biases, enable one or more of the following flags in your configuration:
 
 ```yaml
 torch:
@@ -114,7 +114,7 @@ torch:
     profiler:
       profile: false
       emit_nvtx: false
-  set_float32_matmul_precision: high
+  set_float32_matmul_precision: highest
   backends:
     cuda:
       matmul:
@@ -124,10 +124,10 @@ torch:
       benchmark: true
 wandb:
   watch:
-    enable: true  # Track gradients and parameters during training
+    enable: false  # Track gradients and parameters during training
 ```
 
-Run training with:
+Then, run training with:
 
 ```bash
 autolightning fit -c config.yaml
@@ -159,8 +159,10 @@ data = AutoDataModule(
         "post": PostTransform()  # Applied after phase transform
     },
     target_transforms={
+        "pre_load": LabelTransform(),
         "train": LabelTransform(),
-        "val": LabelTransform()
+        "val": LabelTransform(),
+        "post": LabelTransform()
     },
     batch_transforms={
         "before": BatchTransformBeforeGPU(),
@@ -172,7 +174,7 @@ data = AutoDataModule(
 
 ### Cross-Validation
 
-K-fold cross-validation can be easily implemented:
+K-fold cross-validation can be easily performed:
 
 ```python
 from autolightning.lm import Classifier
@@ -199,6 +201,7 @@ for fold_idx in range(n_splits):
 ```
 
 In configuration:
+
 ```yaml
 data:
   class_path: autolightning.datasets.MNIST
@@ -275,33 +278,33 @@ analysis = tune.run(tune_function, config=search_space)
 ## Pre-made Training Methods
 
 ### Supervised Learning
-- **`Supervised`**: General supervised learning
-- **`Classifier`**: Classification tasks
+- [**`Supervised`**](./autolightning/lm/supervised.py): General supervised learning
+- [**`Classifier`**](./autolightning/lm/classifier.py): Classification tasks
 
 ### Self-supervised Learning
-- **`Siamese`**: Siamese networks for similarity learning
-- **`Triplet`**: Triplet networks for ranking tasks
+- [**`Triplet`**](./autolightning/lm/self_supervised.py): Siamese networks for similarity learning
+- [**`Triplet`**](./autolightning/lm/self_supervised.py): Triplet networks for ranking tasks
 
 ### Knowledge Distillation
-- **`Distilled`**: Knowledge distillation with optional student head and regressor
+- [**`Distilled`**](./autolightning/lm/distilled.py): Knowledge distillation with optional student head and regressor
 
-### Quantization-aware Training
-- **[`BrevitasSupervised`, `BrevitasClassifier`, `BrevitasPrototypical`](./autolightning/lm/qat.py)**: QAT with Brevitas
+### Quantization-Aware Training
+- [**`BrevitasSupervised`, `BrevitasClassifier`, `BrevitasPrototypical`**](./autolightning/lm/brevitas.py): QAT with Brevitas
 
 ### Few-shot Learning
-- **`Prototypical`**: Prototypical networks for few-shot learning
+- [**`Prototypical`**](./autolightning/lm/prototypical.py): Prototypical networks for few-shot learning
 
 ### Coming Soon
 - **Continual Learning**: Stay tuned!
-- **In-context Learning**: Under development
+- **In-context Learning**: Under development!
 
 ## Built-in Datasets
 
-- **`MNIST`**: The classic handwritten digit dataset
-- **`CIFAR10`**: 10-class image classification dataset
-- **`FashionMNIST`**: Fashion items classification
-- **`RootDownloadTrain`**: Wrapper for datasets with (root, download, train) parameters
-- **[`FewShot` and `FewShotMixin`](./autolightning/dm/few_shot.py)**: Convert datasets to few-shot learning format
+- [**`MNIST`**](./autolightning/datasets.py): Classic handwritten digit classification
+- [**`CIFAR10`**](./autolightning/datasets.py): 10-class image classification
+- [**`FashionMNIST`**](./autolightning/datasets.py): Fashion items classification
+- [**`RootDownloadTrain`**](./autolightning/datasets.py): Wrapper for datasets with (root, download, train) parameters
+- [**`FewShot` and `FewShotMixin`**](./autolightning/dm/few_shot.py): Convert any `AutoDataset` to a format suitable for few-shot learning (for example in combination with [**`Prototypical`**](./autolightning/lm/prototypical.py))
 
 ## Model Loading and Modification
 
@@ -312,14 +315,14 @@ model:
   class_path: autolightning.lm.Classifier
   init_args:
     net:
-        class_path: autolightning.load
-        init_args:
-          file_path: path/to/state_dict.pth
-          module:
-            class_path: torchvision.ops.MLP
-            init_args:
-                in_channels: 784
-                hidden_channels: [100, 10]
+      class_path: autolightning.load
+      init_args:
+        file_path: path/to/state_dict.pth
+        module:
+          class_path: torchvision.ops.MLP
+          init_args:
+              in_channels: 784
+              hidden_channels: [100, 10]
 ```
 
 ### Compiling Models
@@ -329,14 +332,14 @@ model:
   class_path: autolightning.lm.Classifier
   init_args:
     net:
-        class_path: autolightning.compile
-        init_args:
-          compiler_path: torch.compile
-          module:
-            class_path: torchvision.ops.MLP
-            init_args:
-                in_channels: 784
-                hidden_channels: [100, 10]
+      class_path: autolightning.compile
+      init_args:
+        compiler_path: torch.compile
+        module:
+          class_path: torchvision.ops.MLP
+          init_args:
+              in_channels: 784
+              hidden_channels: [100, 10]
 ```
 
 ### Freezing Model Parameters
@@ -346,13 +349,13 @@ model:
   class_path: autolightning.lm.Classifier
   init_args:
     net:
-        class_path: autolightning.disable_grad
-        init_args:
-          module:
-            class_path: torchvision.ops.MLP
-            init_args:
-                in_channels: 784
-                hidden_channels: [100, 10]
+      class_path: autolightning.disable_grad
+      init_args:
+        module:
+          class_path: torchvision.ops.MLP
+          init_args:
+              in_channels: 784
+              hidden_channels: [100, 10]
 ```
 
 ## Best Practices
