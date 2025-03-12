@@ -17,7 +17,7 @@ Current benchmarks show an average **15% reduction in lines of code** compared t
 - **Standardized training methods**: Pre-made modules for supervised learning, self-supervised learning, knowledge distillation, and more
 - **Built-in dataset support**: Simplified access to common datasets with customizable transforms
 - **K-fold cross-validation**: Easy implementation of cross-validation strategies
-- **Custom CLI**: Enhanced autolightning command supporting all PyTorch Lightning features plus additional torch flags
+- **Custom CLI**: Enhanced `autolightning` command supporting all PyTorch Lightning features plus additional torch flags
 
 ## Installation
 
