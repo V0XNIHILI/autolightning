@@ -10,14 +10,15 @@ Current benchmarks show an average **15% reduction in lines of code** compared t
 
 ## Key Features
 
-- **Config-driven model training**: Train models with minimal code using YAML, Python dictionaries, or Python files
-- **Comprehensive transform pipelines**: Full support for data transformations including batch transforms
-- **Experiment management**: Seamless integration with WandB and other logging tools
-- **Hyperparameter optimization**: Support for WandB sweeps, Ray Tune, and Optuna
-- **Standardized training methods**: Pre-made modules for supervised learning, self-supervised learning, knowledge distillation, and more
-- **Built-in dataset support**: Simplified access to common datasets with customizable transforms
-- **K-fold cross-validation**: Easy implementation of cross-validation strategies
-- **Custom CLI**: Enhanced `autolightning` command supporting all PyTorch Lightning features plus additional torch flags
+- [**Custom CLI**](#custom-cli): `autolightning`'s CLI application avoids having to create separate `LightningCLI`s for each new project
+- [**Config-driven model training**](#config-driven-model-training): Using the CLI, train models with minimal code using YAML or Python config files
+- [**Comprehensive transform pipelines**](#transform-pipeline): Easily define complex transform pipelines for datasets
+- [**Comprehensive optimizer and scheduler configuration**](#optimizer-and-scheduler-configuration): Define optimizers and schedulers in the configuration file
+- [**Additional (torch) runtime flags**](#additional-runtime-flags): Enable PyTorch performance optimizations or model watching with Weights & Biases from the command line
+- [**Built-in dataset splitting**](#built-in-dataset-splitting): Random split and cross-validation support from the command line / with a configuration file
+- [**Hyperparameter optimization & model watching**](#hyperparameter-sweeps): Use Weights & Biases, Ray Tune, or Optuna for hyperparameter sweeps. Track model gradient results with Weights & Biases from the command line
+- [**Standardized training methods**](#standardized-training-methods): Pre-made modules for supervised learning, self-supervised learning, knowledge distillation, and more
+- [**Config-file utilities**](#config-file-utilities): Load pre-trained models, compile models, or freeze model parameters from a configuration file
 
 ## Installation
 
@@ -105,29 +106,7 @@ trainer:
   max_epochs: 10
 ```
 
-To enable PyTorch performance optimizations or model watching with Weights & Biases, enable one or more of the following flags in your configuration:
-
-```yaml
-torch:
-  autograd:
-    set_detect_anomaly: false
-    profiler:
-      profile: false
-      emit_nvtx: false
-  set_float32_matmul_precision: highest
-  backends:
-    cuda:
-      matmul:
-        allow_tf32: true
-    cudnn:
-      allow_tf32: true
-      benchmark: true
-wandb:
-  watch:
-    enable: false  # Track gradients and parameters during training
-```
-
-Then, run training with:
+Then, run training with the following command:
 
 ```bash
 autolightning fit -c config.yaml
@@ -136,6 +115,60 @@ autolightning fit -c config.yaml
 All hyperparameters will be automatically logged to your selected logger.
 
 ## Key Features in Detail
+
+### Custom CLI
+
+The `autolightning` command line interface is based is a derived class from PyTorch Lightning's `LightningCLI` and supports all of its features while adding additional functionality. It supports, among others:
+
+- Hyperparameter sweeps
+- Python configuration files
+- Additional torch
+- Support for WandB model watching
+- Support for WandB sweeps
+
+### Config-driven model training
+
+#### Automated Logging of Hyperparameters
+
+All hyperparameters are automatically logged to the logger of your choice (e.g. Weights & Biases, TensorBoard, etc.) when using the `autolightning` command line interface. This enables easy tracking of experiments and results.
+
+#### Python Config Files
+
+Supporting Python files for configuration files has the key advantages that it is posssible to have conditional logic or for-loops used in the configuration.
+
+```bash
+autolightning fit -c config.py
+```
+
+By default, the `AutoCLI` looks for a dictionary named `config` when you pass Python config script:
+
+```python
+config = {
+  "model": ...,
+  "data": ...,
+}
+```
+
+Alternatively, you can also specify a custom configuration name:
+
+```python
+CONFIG_NAME = "my_own_config"
+
+my_own_config = {
+  "model": ...,
+  "data": ...,
+}
+```
+
+Finally, it is also possible to use a config function:
+
+```python
+def config():
+  return {
+    "model": ...,
+    "data": ...,
+  }
+```
 
 ### Transform Pipeline
 
@@ -172,46 +205,37 @@ data = AutoDataModule(
 )
 ```
 
-### Cross-Validation
+### Optimizer and Scheduler Configuration
 
-K-fold cross-validation can be easily performed:
+To do!
 
-```python
-from autolightning.lm import Classifier
-from autolightning.datasets import MNIST
+### Additional runtime flags
 
-n_splits = 5
-
-data = lambda i: MNIST(
-    root="data",
-    dataloaders=dict(batch_size=128),
-    transforms=[transforms.ToTensor(), nn.Flatten(start_dim=0)],
-    # Specify the cross validation setup
-    cross_val=dict(n_splits=n_splits, fold=i)
-)
-
-for fold_idx in range(n_splits):
-    net = nn.Linear(28*28, 10)
-    model = Classifier(
-        net=net, 
-        optimizer=torch.optim.Adam(net.parameters(), lr=0.003)
-    )
-    trainer = Trainer(max_epochs=2)
-    trainer.fit(model, data(fold_idx))
-```
-
-In configuration:
+To enable PyTorch performance optimizations or model watching with Weights & Biases, enable one or more of the following flags in your configuration:
 
 ```yaml
-data:
-  class_path: autolightning.datasets.MNIST
-  init_args:
-    cross_val:
-      n_splits: 5
-      fold: 0
+torch:
+  autograd:
+    set_detect_anomaly: false
+    profiler:
+      profile: false
+      emit_nvtx: false
+  set_float32_matmul_precision: highest
+  backends:
+    cuda:
+      matmul:
+        allow_tf32: true
+    cudnn:
+      allow_tf32: true
+      benchmark: true
+wandb:
+  watch:
+    enable: false  # Track gradients and parameters during training
 ```
 
-### Random Split
+### Built-in Dataset Splitting
+
+#### Random Split
 
 Split a dataset into train/val/test with specified ratios:
 
@@ -224,6 +248,53 @@ data:
       val: 0.2
       test: 0.1
     seed: 42  # For reproducibility
+```
+
+#### Cross-Validation
+
+K-fold cross-validation can be easily performed on any dataset:
+
+```python
+from autolightning.lm import Classifier
+from autolightning.datasets import MNIST
+
+n_folds = 5
+
+data = lambda i: MNIST(
+    root="data",
+    dataloaders=dict(batch_size=128),
+    transforms=[transforms.ToTensor(), nn.Flatten(start_dim=0)],
+    # Specify the cross validation setup
+    cross_val=dict(n_folds=n_folds, fold_idx=i)
+)
+
+for fold_idx in range(n_folds):
+    net = nn.Linear(28*28, 10)
+    model = Classifier(
+        net=net, 
+        optimizer=torch.optim.Adam(net.parameters(), lr=0.003)
+    )
+    trainer = Trainer(max_epochs=2)
+    trainer.fit(model, data(fold_idx))
+```
+
+In a configuration file:
+
+```yaml
+data:
+  class_path: autolightning.datasets.MNIST
+  init_args:
+    cross_val:
+      n_folds: 5
+      fold_idx: 0
+```
+
+Then, run training with the following command:
+
+```bash
+for idx in {0..4}; do
+    autolightning fit -c config.yaml --data.init_args.cross_val.fold_idx $idx
+done
 ```
 
 ### Hyperparameter Sweeps
@@ -275,7 +346,7 @@ search_space = {
 analysis = tune.run(tune_function, config=search_space)
 ```
 
-## Pre-made Training Methods
+## Standardized Training Methods
 
 ### Supervised Learning
 - [**`Supervised`**](./autolightning/lm/supervised.py): General supervised learning
@@ -306,9 +377,9 @@ analysis = tune.run(tune_function, config=search_space)
 - [**`RootDownloadTrain`**](./autolightning/datasets.py): Wrapper for datasets with (root, download, train) parameters
 - [**`FewShot` and `FewShotMixin`**](./autolightning/dm/few_shot.py): Convert any `AutoDataset` to a format suitable for few-shot learning (for example in combination with [**`Prototypical`**](./autolightning/lm/prototypical.py))
 
-## Model Loading and Modification
+### Config-file utilities
 
-### Loading Pre-trained Models
+#### Loading Pre-trained Models
 
 ```yaml
 model:
@@ -325,7 +396,7 @@ model:
               hidden_channels: [100, 10]
 ```
 
-### Compiling Models
+#### Compiling Models
 
 ```yaml
 model:
@@ -342,7 +413,7 @@ model:
               hidden_channels: [100, 10]
 ```
 
-### Freezing Model Parameters
+#### Freezing Model Parameters
 
 ```yaml
 model:
@@ -436,7 +507,7 @@ class MyDataModule(AutoDataModule):
 
 ## Advanced Usage
 
-### Running from a Config File in a Script
+### Running with a Config File in a Script
 
 ```python
 import yaml
