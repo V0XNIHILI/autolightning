@@ -8,7 +8,7 @@ from torch.nn.parameter import Parameter
 import lightning as L
 from pytorch_lightning.utilities.types import OptimizerLRScheduler
 
-from lightning.pytorch.cli import OptimizerCallable, LRSchedulerCallable
+from lightning.pytorch.cli import OptimizerCallable
 
 from .types import MetricType, OptimizerType, LrSchedulerType, Phase
 
@@ -158,8 +158,7 @@ class AutoModule(L.LightningModule):
                     if isinstance(module, nn.ModuleList):
                         extra_optimizers = [opt(module[i].parameters()) for i, opt in enumerate(optimizer)]
                     else:
-                        params_call = params = self.parameters_for_optimizer if module == self else module.parameters
-                        extra_optimizers = [opt(params_call()) for opt in optimizer]
+                        raise ValueError(f"Cannot use list of optimizers with non-ModuleList module: {module}")
 
                     optimizers.extend(extra_optimizers)
                 else:
