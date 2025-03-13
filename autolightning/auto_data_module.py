@@ -21,6 +21,8 @@ PHASES = ["train", "val", "test", "pred"]
 ALLOWED_DATASET_KEYS = PHASES + ["defaults"]
 PRE_LOAD_MOMENT = "pre_load"
 ARGS_KEY = "args"
+FOLD_IDX_KEY = "fold_idx"
+N_FOLDS_KEY = "n_folds"
 
 AllDatasetsType = Union[Dataset, IterableDataset]
 TransformType = Union[Dict[str, TransformValue], TransformValue]
@@ -200,7 +202,7 @@ class AutoDataModule(L.LightningDataModule):
                 samples per set in this dictionary.
             cross_val (Optional[Dict[str, int]]):
                 A dictionary that specifies how to perform cross-validation on the dataset. The dictionary must
-                contain the keys `n_splits` and `fold` to specify the number of splits and the fold index to be
+                contain the keys `n_folds` and `fold_idx` to specify the number of splits and the fold index to be
                 used.
             seed (Optional[int]):
                 Seed to be used for random splitting and cross-validation. If not specified, the dataset will not
@@ -267,16 +269,16 @@ class AutoDataModule(L.LightningDataModule):
                 if not isinstance(self.cross_val, dict):
                     raise TypeError(f"Unsupported cross-validation configuration: {self.cross_val}; must be a dictionary")
 
-                assert self.cross_val["n_splits"] > self.cross_val["fold"] >= 0, f"Invalid fold index {self.cross_val['fold']} for {self.cross_val['n_splits']} splits"
+                assert self.cross_val[N_FOLDS_KEY] > self.cross_val[FOLD_IDX_KEY] >= 0, f"Invalid fold index {self.cross_val['fold']} for {self.cross_val['n_folds']} splits"
 
                 from sklearn.model_selection import KFold
 
                 shuffle = self.seed is not None
 
-                kf = KFold(n_splits=self.cross_val["n_splits"], shuffle=shuffle, random_state=self.seed)
+                kf = KFold(n_folds=self.cross_val[N_FOLDS_KEY], shuffle=shuffle, random_state=self.seed)
 
                 for i, (train_indices, val_indices) in enumerate(kf.split(datasets)):
-                    if i == self.cross_val["fold"]:
+                    if i == self.cross_val[FOLD_IDX_KEY]:
                         self.instantiated_dataset['train'] = torch.utils.data.Subset(datasets, train_indices)
                         self.instantiated_dataset['val'] = torch.utils.data.Subset(datasets, val_indices)
                         break
@@ -317,16 +319,16 @@ class AutoDataModule(L.LightningDataModule):
                         if not isinstance(self.cross_val, dict):
                             raise TypeError(f"Unsupported cross-validation configuration: {self.cross_val}; must be a dictionary")
 
-                        assert self.cross_val["n_splits"] > self.cross_val["fold"] >= 0, f"Invalid fold index {self.cross_val['fold']} for {self.cross_val['n_splits']} splits"
+                        assert self.cross_val[N_FOLDS_KEY] > self.cross_val[FOLD_IDX_KEY] >= 0, f"Invalid fold index {self.cross_val['fold']} for {self.cross_val['n_folds']} splits"
 
                         from sklearn.model_selection import KFold
 
                         shuffle = self.seed is not None
 
-                        kf = KFold(n_splits=self.cross_val["n_splits"], shuffle=shuffle, random_state=self.seed)
+                        kf = KFold(n_folds=self.cross_val[N_FOLDS_KEY], shuffle=shuffle, random_state=self.seed)
 
                         for i, (train_indices, val_indices) in enumerate(kf.split(dataset)):
-                            if i == self.cross_val["fold"]:
+                            if i == self.cross_val[FOLD_IDX_KEY]:
                                 self.instantiated_dataset['train'] = torch.utils.data.Subset(dataset, train_indices)
                                 self.instantiated_dataset['val'] = torch.utils.data.Subset(dataset, val_indices)
                                 instantiate_dataset_keys.extend(['train', 'val'])
@@ -397,21 +399,22 @@ class AutoDataModule(L.LightningDataModule):
 
         return kwargs
     
-    def get_dataloader(self, phase: Phase, dataset: Dataset):
+    def get_dataloader(self, phase: Phase):
+        dataset = self.get_transformed_dataset('train')
         kwargs = self.get_dataloader_kwargs(phase)
         return DataLoader(dataset, **kwargs)
 
     def train_dataloader(self):
-        return self.get_dataloader('train', self.get_transformed_dataset('train'))
+        return self.get_dataloader('train')
     
     def val_dataloader(self):
-        return self.get_dataloader('val', self.get_transformed_dataset('val'))
+        return self.get_dataloader('val')
     
     def test_dataloader(self):
-        return self.get_dataloader('test', self.get_transformed_dataset('test'))
+        return self.get_dataloader('test')
     
     def predict_dataloader(self):
-        return self.get_dataloader('pred', self.get_transformed_dataset('pred'))
+        return self.get_dataloader('pred')
     
     def on_before_batch_transfer(self, batch, dataloader_idx: int):
         return apply_batch_transforms(
