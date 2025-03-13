@@ -4,7 +4,7 @@
 
 ## Overview
 
-`autolightning` provides a zero-code, configuration-driven approach to training PyTorch models using PyTorch Lightning. By specifying models, datasets, transforms, optimizers, and more through configuration dictionaries, you can significantly reduce boilerplate code while maintaining flexibility, improving reproducibility, and enhancing customization options.
+`autolightning` provides a zero-code, configuration-driven approach to training PyTorch models using PyTorch Lightning. By specifying models, datasets, transforms, optimizers, and more through configuration dictionaries, you can significantly reduce boilerplate code while maintaining flexibility, improving reproducibility, and enhancing customization options while increasing reproducibility.
 
 Current benchmarks show an average **15% reduction in lines of code** compared to standard PyTorch Lightning implementations, without compromising functionality.
 
