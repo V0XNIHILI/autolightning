@@ -13,7 +13,7 @@ Current benchmarks show an average **15% reduction in lines of code** compared t
 - [**Custom CLI**](#custom-cli): `autolightning`'s CLI application avoids having to create separate `LightningCLI`s for each new project
 - [**Config-driven model training**](#config-driven-model-training): Using the CLI, train models with minimal code using YAML or Python config files
 - [**Comprehensive transform pipelines**](#transform-pipeline): Easily define complex transform pipelines for datasets
-- [**Comprehensive optimizer and scheduler configuration**](#optimizer-and-scheduler-configuration): Define optimizers and schedulers in the configuration file
+- [**Flexible optimizer and scheduler configuration**](#optimizer-and-scheduler-configuration): Define optimizers and schedulers in the configuration file
 - [**Additional (torch) runtime flags**](#additional-runtime-flags): Enable PyTorch performance optimizations or model watching with Weights & Biases from the command line
 - [**Built-in dataset splitting**](#built-in-dataset-splitting): Random split and cross-validation support from the command line / with a configuration file
 - [**Hyperparameter optimization & model watching**](#hyperparameter-sweeps): Use Weights & Biases, Ray Tune, or Optuna for hyperparameter sweeps. Track model gradient results with Weights & Biases from the command line
@@ -207,7 +207,126 @@ data = AutoDataModule(
 
 ### Optimizer and Scheduler Configuration
 
-To do!
+By default when using `LightningCLI`, you can specify the optimizer and scheduler in the configuration file in the following way:
+
+```yaml
+data: ...
+model: ...
+optimizer:
+  class_path: torch.optim.AdamW
+  init_args:
+    lr: 1e-4
+lr_scheduler:
+  class_path: torch.optim.lr_scheduler.CosineAnnealingLR
+  init_args:
+    T_max: 100
+    eta_min: 0.0
+```
+
+However, this is not very flexible for more advanced use cases. Hence, in `autolightning`, you can specify the optimizer and scheduler as arguments to the model class:
+
+```yaml
+data: ...
+model:
+  ...
+  optimizer:
+    class_path: autolightning.optim
+    dict_kwargs:
+      optimizer_path: AdamW
+      lr: 1e-4
+  lr_scheduler:
+    class_path: autolightning.sched
+    dict_kwargs:
+      scheduler_path: torch.optim.lr_scheduler.CosineAnnealingLR
+      T_max: 100
+      eta_min: 0.0
+```
+
+This allows for more flexibility in the configuration file. For example, to specify different optimizers for different parts of the model:
+
+```yaml
+model:
+  net:
+    class_path: nn.ModuleDict
+    init_args:
+      modules:
+        encoder:
+          class_path: torchvision.ops.MLP
+          init_args:
+            in_channels: 784
+            hidden_channels: [100, 10]
+        decoder:
+          class_path: torchvision.ops.MLP
+          init_args:
+            in_channels: 10
+            hidden_channels: [100, 784]
+  optimizer:
+    encoder:
+      class_path: autolightning.optim
+      dict_kwargs:
+        optimizer_path: AdamW
+        lr: 1e-4
+    decoder:
+      class_path: autolightning.optim
+      dict_kwargs:
+        optimizer_path: SGD
+        lr: 1e-3
+  lr_scheduler:
+    class_path: autolightning.sched
+    dict_kwargs:
+      scheduler_path: torch.optim.lr_scheduler.CosineAnnealingLR
+      T_max: 100
+      eta_min: 0.0
+```
+
+Or, with a list of modules instead of a dict:
+
+```yaml
+model:
+  net:
+    class_path: nn.ModuleList
+    init_args:
+      modules:
+        - class_path: torchvision.ops.MLP
+          init_args:
+            in_channels: 784
+            hidden_channels: [100, 10]
+        - class_path: torchvision.ops.MLP
+          init_args:
+            in_channels: 10
+            hidden_channels: [100, 784]
+  optimizer:
+    - class_path: autolightning.optim
+      dict_kwargs:
+        optimizer_path: AdamW
+        lr: 1e-4
+    - class_path: autolightning.optim
+      dict_kwargs:
+        optimizer_path: SGD
+        lr: 1e-3
+  lr_scheduler:
+    class_path: autolightning.sched
+    dict_kwargs:
+      scheduler_path: torch.optim.lr_scheduler.CosineAnnealingLR
+      T_max: 100
+      eta_min: 0.0
+```
+
+Note that it is also easy to [change the learning rate scheduler configuration](https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.core.LightningModule.html#lightning.pytorch.core.LightningModule.configure_optimizers):
+
+```yaml
+model:
+  ...
+  optimizer: ...
+  lr_scheduler:
+    interval: step
+    scheduler:
+      class_path: autolightning.sched
+      dict_kwargs:
+        scheduler_path: torch.optim.lr_scheduler.CosineAnnealingLR
+        T_max: 100
+        eta_min: 0.0
+```
 
 ### Additional runtime flags
 
