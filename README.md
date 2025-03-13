@@ -465,30 +465,30 @@ search_space = {
 analysis = tune.run(tune_function, config=search_space)
 ```
 
-## Standardized Training Methods
+### Standardized Training Methods
 
-### Supervised Learning
+#### Supervised Learning
 - [**`Supervised`**](./autolightning/lm/supervised.py): General supervised learning
 - [**`Classifier`**](./autolightning/lm/classifier.py): Classification tasks
 
-### Self-supervised Learning
+#### Self-supervised Learning
 - [**`Triplet`**](./autolightning/lm/self_supervised.py): Siamese networks for similarity learning
 - [**`Triplet`**](./autolightning/lm/self_supervised.py): Triplet networks for ranking tasks
 
-### Knowledge Distillation
+#### Knowledge Distillation
 - [**`Distilled`**](./autolightning/lm/distilled.py): Knowledge distillation with optional student head and regressor
 
-### Quantization-Aware Training
+#### Quantization-Aware Training
 - [**`BrevitasSupervised`, `BrevitasClassifier`, `BrevitasPrototypical`**](./autolightning/lm/brevitas.py): QAT with Brevitas
 
-### Few-shot Learning
+#### Few-shot Learning
 - [**`Prototypical`**](./autolightning/lm/prototypical.py): Prototypical networks for few-shot learning
 
-### Coming Soon
+#### Coming Soon
 - **Continual Learning**: Stay tuned!
 - **In-context Learning**: Under development!
 
-## Built-in Datasets
+### Built-in Datasets
 
 - [**`MNIST`**](./autolightning/datasets.py): Classic handwritten digit classification
 - [**`CIFAR10`**](./autolightning/datasets.py): 10-class image classification
