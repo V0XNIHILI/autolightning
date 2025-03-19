@@ -133,6 +133,38 @@ def test_datasets_per_phase():
         assert ds_val[i] == ds_from_data_val[i]
 
 
+def test_dataloaders_per_phase():
+    ds_train = CIFAR10("data", train=True, download=True)
+    ds_val = CIFAR10("data", train=False, download=True)
+
+    data = AutoDataModule(
+        dataset=dict(
+            train=ds_train,
+            val=ds_val,
+            data_loader=dict(
+                train=dict(batch_size=32),
+                val=dict(batch_size=64)
+            )
+        )
+    )
+
+    data.prepare_data()
+
+    data.setup('fit')
+
+    train_dl = data.train_dataloader()
+    val_dl = data.val_dataloader()
+
+    for i in range(len(ds_train)):
+        assert ds_train[i] == train_dl.dataset[i]
+
+    for i in range(len(ds_val)):
+        assert ds_val[i] == val_dl.dataset[i]
+
+    assert train_dl.batch_size == 32
+    assert val_dl.batch_size == 64
+
+
 def test_post_init_dataset_per_phase():
     data = AutoDataModule(
         dataset=dict(
