@@ -94,7 +94,7 @@ def instantiate_datasets(dataset: Optional[Union[Dict[str, Dataset], Dict, Datas
         
         return instantiate_class(tuple(), init | {"init_args": dataset.get(ARGS_KEY, {})})
     
-    raise ValueError(f"Unsupported dataset configuration: {dataset}")
+    raise ValueError(f"Unsupported dataset configuration: {dataset}; should either be a dataset instance, a dictionary with a 'class_name' key or a dictionary with dataset instances for one ore more phases")
 
 
 def compose_if_list(tf: Optional[TransformValue]) -> Optional[Callable]:
