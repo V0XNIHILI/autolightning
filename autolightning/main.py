@@ -62,6 +62,29 @@ def auto_main(config: Optional[Union[List[dict], dict]] = None, subcommand: Opti
     return cli.trainer, cli.model, cli.datamodule
 
 
+def auto_data(config: Union[List[dict], dict], includes_data_key: bool = True):
+    final_config = {}
+
+    if isinstance(config, list):
+        for subconfig in config:
+            final_config = _merge_dicts(final_config, subconfig)
+    else:
+        final_config = config
+
+    if not includes_data_key:
+        final_config = {"data": final_config}
+    else:
+        final_config["trainer"] = {}
+        final_config["optimizer"] = None
+        final_config["lr_scheduler"] = None
+
+    final_config["model"] = {"class_path": "autolightning.AutoModule"}
+
+    _, _, ds = auto_main(final_config, run=False)
+
+    return ds
+
+
 def cli_main():
     # Created a separate function for the CLI that does not
     # return anything to avoid a non-zero exit code.

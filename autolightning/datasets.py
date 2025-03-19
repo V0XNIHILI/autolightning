@@ -1,6 +1,7 @@
 from . import AutoDataModule
 from .types import AutoDataModuleKwargsNoDatasetPrepareSplit, Unpack
 
+
 class RootDownloadTrain(AutoDataModule):
     def __init__(self, name: str, root: str, download: bool = False, val_percentage: float = 0.1, **kwargs: Unpack[AutoDataModuleKwargsNoDatasetPrepareSplit]):
         super().__init__(

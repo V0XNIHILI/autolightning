@@ -17,10 +17,12 @@ from .types import Phase, TransformValue
 from torch_mate.data.utils import Transformed, TransformedIterable, PreLoaded
 
 
-STAGES = ["train", "val", "test", "pred"]
-ALLOWED_DATASET_KEYS = STAGES + ["defaults"]
+PHASES = ["train", "val", "test", "pred"]
+ALLOWED_DATASET_KEYS = PHASES + ["defaults"]
 PRE_LOAD_MOMENT = "pre_load"
 ARGS_KEY = "args"
+FOLD_IDX_KEY = "fold_idx"
+N_FOLDS_KEY = "n_folds"
 
 AllDatasetsType = Union[Dataset, IterableDataset]
 TransformType = Union[Dict[str, TransformValue], TransformValue]
@@ -33,19 +35,34 @@ def instantiate_datasets(dataset: Optional[Union[Dict[str, Dataset], Dict, Datas
     if not isinstance(dataset, dict):
         raise ValueError(f"Unsupported dataset configuration: {dataset}; can either be None, a Dataset instance or a dictionary")
     
-    # If the dictionary has any of the stages, then it is a dictionary of datasets per stage
-    if any(key in dataset for key in STAGES):
-        # Make sure no other keys are present except for the stages
-        assert set(dataset.keys()) - set(STAGES) == set(), f"Unsupported keys in dataset configuration: {set(dataset.keys()) - set(STAGES)}"
-        # Make sure all values are datasets
-        assert all(isinstance(ds, Dataset) for ds in dataset.values()), f"Unsupported values in dataset configuration that are not an instance of a Dataset: {set(type(ds) for ds in dataset.values())}"
+    # If the dictionary has any of the phases, then it is a dictionary of datasets per stage
+    if any(key in dataset for key in PHASES):
+        dataset_dict = {}
 
-        return dataset
+        for key, ds in dataset.items():
+            if key not in PHASES:
+                raise ValueError(f"Unsupported phase key in dataset configuration: {key}")
+            
+            if isinstance(ds, Dataset):
+                dataset_dict[key] = ds
+            elif "class_name" in ds:
+                init = {"class_path": ds["class_name"], "init_args": ds.get(ARGS_KEY, {})}
+
+                if type(init["class_path"]) is str:
+                    dataset_dict[key] = instantiate_class(tuple(), init)
+                else:
+                    dataset_dict[key] = init["class_path"](**init["init_args"])
+
+                dataset_dict[key] = instantiate_class(tuple(), init)
+            else:
+                raise ValueError(f"Unsupported dataset configuration; should be a Dataset instance or a dictionary with a 'class_name' key: {ds}")
+
+        return dataset_dict
     
-    if "class" in dataset:
-        init = {"class_path": dataset["class"]}
+    if "class_name" in dataset:
+        init = {"class_path": dataset["class_name"]}
 
-        # There is this weird bug, where dataset["class"] can be a Namespace object with empty args
+        # There is this weird bug, where dataset["class_name"] can be a Namespace object with empty args
         # if this dictionary is set via a YAML file
         if isinstance(init["class_path"], Namespace):
             init["class_path"] = dict(init["class_path"])["class_path"]
@@ -56,7 +73,6 @@ def instantiate_datasets(dataset: Optional[Union[Dict[str, Dataset], Dict, Datas
             assert set(dataset[ARGS_KEY].keys()) - set(ALLOWED_DATASET_KEYS) == set(), f"Unsupported keys in dataset configuration: {set(dataset['args'].keys()) - set(ALLOWED_DATASET_KEYS)}"
 
             defaults = dataset[ARGS_KEY].get("defaults", {})
-
 
             dataset_dict = {}
 
@@ -94,13 +110,13 @@ def compose_if_list(tf: Optional[TransformValue]) -> Optional[Callable]:
     return tf
 
 
-def build_transform(stage: str, transforms: TransformType) -> (Callable | None):
+def build_transform(phase: str, transforms: TransformType) -> (Callable | None):
     if type(transforms) is not dict:
         return compose_if_list(transforms)
 
     tfs = []
 
-    for key in ["pre", stage, "post"]:
+    for key in ["pre", phase, "post"]:
         if key in transforms:
             tf = compose_if_list(transforms[key])
             tfs.append(tf)
@@ -186,7 +202,7 @@ class AutoDataModule(L.LightningDataModule):
                 samples per set in this dictionary.
             cross_val (Optional[Dict[str, int]]):
                 A dictionary that specifies how to perform cross-validation on the dataset. The dictionary must
-                contain the keys `n_splits` and `fold` to specify the number of splits and the fold index to be
+                contain the keys `n_folds` and `fold_idx` to specify the number of splits and the fold index to be
                 used.
             seed (Optional[int]):
                 Seed to be used for random splitting and cross-validation. If not specified, the dataset will not
@@ -208,6 +224,10 @@ class AutoDataModule(L.LightningDataModule):
         self.random_split = random_split
         self.cross_val = cross_val
 
+        # Perform XOR
+        if self.cross_val and self.random_split:
+            raise ValueError("Both random_split and cross_val are specified; only one of them can be used at a time.")
+
         self.seed = seed
 
         self.instantiated_dataset: Union[Dataset, Dict[str, Dataset]] = {}
@@ -228,41 +248,37 @@ class AutoDataModule(L.LightningDataModule):
         if datasets == None:
             return
         
-        relevant_keys = []
+        relevant_phases = []
 
         if stage == 'fit':
-            relevant_keys = ['train', 'val']
+            relevant_phases = ['train', 'val']
         elif stage == 'test':
-            relevant_keys = ['test']
+            relevant_phases = ['test']
         elif stage == 'predict':
-            relevant_keys = ['pred']
+            relevant_phases = ['pred']
         elif stage == 'validate':
-            relevant_keys = ['val']
+            relevant_phases = ['val']
 
         generator = torch.Generator()
 
         if self.seed is not None:
             generator = generator.manual_seed(self.seed)
 
-        # Perform XOR
-        if self.cross_val and self.random_split:
-            warnings.warn("Both random_split and cross_val are specified; only cross_val will be used. Make sure that this is intended behaviour.")
-
         if isinstance(datasets, Dataset):
             if self.cross_val:
                 if not isinstance(self.cross_val, dict):
                     raise TypeError(f"Unsupported cross-validation configuration: {self.cross_val}; must be a dictionary")
 
-                assert self.cross_val["n_splits"] > self.cross_val["fold"] >= 0, f"Invalid fold index {self.cross_val['fold']} for {self.cross_val['n_splits']} splits"
+                assert self.cross_val[N_FOLDS_KEY] > self.cross_val[FOLD_IDX_KEY] >= 0, f"Invalid fold index {self.cross_val['fold']} for {self.cross_val['n_folds']} splits"
 
                 from sklearn.model_selection import KFold
 
                 shuffle = self.seed is not None
 
-                kf = KFold(n_splits=self.cross_val["n_splits"], shuffle=shuffle, random_state=self.seed)
+                kf = KFold(n_folds=self.cross_val[N_FOLDS_KEY], shuffle=shuffle, random_state=self.seed)
 
                 for i, (train_indices, val_indices) in enumerate(kf.split(datasets)):
-                    if i == self.cross_val["fold"]:
+                    if i == self.cross_val[FOLD_IDX_KEY]:
                         self.instantiated_dataset['train'] = torch.utils.data.Subset(datasets, train_indices)
                         self.instantiated_dataset['val'] = torch.utils.data.Subset(datasets, val_indices)
                         break
@@ -270,20 +286,23 @@ class AutoDataModule(L.LightningDataModule):
                 if not isinstance(self.random_split, dict):
                     raise TypeError(f"Unsupported random split configuration: {self.random_split}; must be a dictionary")
 
-                assert set(self.random_split.keys()) - set(STAGES) == set(), f"Unsupported keys in random split configuration: {set(self.random_split.keys()) - set(STAGES)}"
+                assert set(self.random_split.keys()) - set(PHASES) == set(), f"Unsupported keys in random split configuration: {set(self.random_split.keys()) - set(PHASES)}"
 
                 dataset_splits = torch_random_split(datasets, self.random_split.values(), generator=generator)
                 datasets = dict(zip(self.random_split.keys(), dataset_splits))
 
-                for phase_key in relevant_keys:
+                for phase_key in relevant_phases:
                     self.instantiated_dataset[phase_key] = datasets[phase_key]
             else:
-                for phase_key in relevant_keys:
+                for phase_key in relevant_phases:
+                    if phase_key != 'train':
+                        warnings.warn(f"Only one dataset was specified, but it will be used for multiple phases: {relevant_phases}")
+            
                     self.instantiated_dataset[phase_key] = datasets
         else:
             instantiate_dataset_keys = []
 
-            for phase_key in relevant_keys:
+            for phase_key in relevant_phases:
                 if phase_key in instantiate_dataset_keys:
                     continue
 
@@ -300,16 +319,16 @@ class AutoDataModule(L.LightningDataModule):
                         if not isinstance(self.cross_val, dict):
                             raise TypeError(f"Unsupported cross-validation configuration: {self.cross_val}; must be a dictionary")
 
-                        assert self.cross_val["n_splits"] > self.cross_val["fold"] >= 0, f"Invalid fold index {self.cross_val['fold']} for {self.cross_val['n_splits']} splits"
+                        assert self.cross_val[N_FOLDS_KEY] > self.cross_val[FOLD_IDX_KEY] >= 0, f"Invalid fold index {self.cross_val['fold']} for {self.cross_val['n_folds']} splits"
 
                         from sklearn.model_selection import KFold
 
                         shuffle = self.seed is not None
 
-                        kf = KFold(n_splits=self.cross_val["n_splits"], shuffle=shuffle, random_state=self.seed)
+                        kf = KFold(n_folds=self.cross_val[N_FOLDS_KEY], shuffle=shuffle, random_state=self.seed)
 
                         for i, (train_indices, val_indices) in enumerate(kf.split(dataset)):
-                            if i == self.cross_val["fold"]:
+                            if i == self.cross_val[FOLD_IDX_KEY]:
                                 self.instantiated_dataset['train'] = torch.utils.data.Subset(dataset, train_indices)
                                 self.instantiated_dataset['val'] = torch.utils.data.Subset(dataset, val_indices)
                                 instantiate_dataset_keys.extend(['train', 'val'])
@@ -329,7 +348,7 @@ class AutoDataModule(L.LightningDataModule):
                     self.instantiated_dataset[phase_key] = dataset
                     instantiate_dataset_keys.append(phase_key)
 
-    def get_dataset(self, phase: Phase):
+    def get_dataset(self, phase: Phase) -> Union[Dataset, IterableDataset]:
         if phase not in self.instantiated_dataset:
             raise KeyError(f"Dataset for phase {phase} not found; make sure to call `setup` before accessing the dataset")
             
@@ -380,21 +399,22 @@ class AutoDataModule(L.LightningDataModule):
 
         return kwargs
     
-    def get_dataloader(self, phase: Phase, dataset: Dataset):
+    def get_dataloader(self, phase: Phase):
+        dataset = self.get_transformed_dataset('train')
         kwargs = self.get_dataloader_kwargs(phase)
         return DataLoader(dataset, **kwargs)
 
     def train_dataloader(self):
-        return self.get_dataloader('train', self.get_transformed_dataset('train'))
+        return self.get_dataloader('train')
     
     def val_dataloader(self):
-        return self.get_dataloader('val', self.get_transformed_dataset('val'))
+        return self.get_dataloader('val')
     
     def test_dataloader(self):
-        return self.get_dataloader('test', self.get_transformed_dataset('test'))
+        return self.get_dataloader('test')
     
     def predict_dataloader(self):
-        return self.get_dataloader('pred', self.get_transformed_dataset('pred'))
+        return self.get_dataloader('pred')
     
     def on_before_batch_transfer(self, batch, dataloader_idx: int):
         return apply_batch_transforms(
