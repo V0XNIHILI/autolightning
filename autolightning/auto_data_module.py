@@ -400,7 +400,7 @@ class AutoDataModule(L.LightningDataModule):
         return kwargs
     
     def get_dataloader(self, phase: Phase):
-        dataset = self.get_transformed_dataset(dataset)
+        dataset = self.get_transformed_dataset(phase)
         kwargs = self.get_dataloader_kwargs(phase)
         return DataLoader(dataset, **kwargs)
 
