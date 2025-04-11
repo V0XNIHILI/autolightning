@@ -11,11 +11,11 @@ Current benchmarks show an average **15% reduction in lines of code** compared t
 ## Key Features
 
 - [**Custom CLI**](#custom-cli): `autolightning`'s CLI application avoids having to create separate `LightningCLI`s for each new project
-- [**Config-driven model training**](#config-driven-model-training): Using the CLI, train models with minimal code using YAML or Python config files
+- [**Config-driven model training**](#config-driven-model-training): Using the CLI, train models with minimal code using YAML or Python config files, which will automatically be logged as hyperparameters to your selected logger
 - [**Comprehensive transform pipelines**](#transform-pipeline): Easily define complex transform pipelines for datasets
 - [**Flexible optimizer and scheduler configuration**](#optimizer-and-scheduler-configuration): Define optimizers and schedulers in the configuration file
-- [**Additional (torch) runtime flags**](#additional-runtime-flags): Enable PyTorch performance optimizations or model watching with Weights & Biases from the command line
-- [**Built-in dataset splitting**](#built-in-dataset-splitting): Random split and cross-validation support from the command line / with a configuration file
+- [**Additional (torch) runtime flags**](#additional-runtime-flags): Enable PyTorch performance optimizations from the command line
+- [**Built-in dataset splitting**](#built-in-dataset-splitting): Random split and cross-validation support from the command line or with a configuration file
 - [**Hyperparameter optimization & model watching**](#hyperparameter-sweeps): Use Weights & Biases, Ray Tune, or Optuna for hyperparameter sweeps. Track model gradient results with Weights & Biases from the command line
 - [**Standardized training methods**](#standardized-training-methods): Pre-made modules for supervised learning, self-supervised learning, knowledge distillation, and more
 - [**Config-file utilities**](#config-file-utilities): Load pre-trained models, compile models, or freeze model parameters from a configuration file
