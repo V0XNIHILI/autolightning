@@ -672,4 +672,4 @@ datamodule = auto_data(
 
 ---
 
-© (2025) Douwe den Blanken, Delft, the Netherlands
+© (2025) Douwe den Blanken, Delft, The Netherlands
