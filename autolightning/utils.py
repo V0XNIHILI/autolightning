@@ -1,4 +1,4 @@
-from typing import Any, Optional, Dict
+from typing import Any, Optional, Dict, List
 from collections import OrderedDict
 from functools import partial
 import importlib
@@ -65,6 +65,10 @@ def compile(module: nn.Module, compiler_path: str, compiler_kwargs: Optional[Dic
     function = _import_module(compiler_path)
 
     return function(module, **(compiler_kwargs if compiler_kwargs != None else {}))
+
+
+def sequential(modules: List[nn.Module]) -> nn.Sequential:
+    return nn.Sequential(*modules) if modules else nn.Sequential()
 
 
 def disable_grad(module: nn.Module) -> nn.Module:
