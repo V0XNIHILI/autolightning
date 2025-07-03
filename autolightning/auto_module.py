@@ -195,15 +195,15 @@ class AutoModule(L.LightningModule):
 
         return optimizers, schedulers
 
-    def register_metric(self, name: str, metric: MetricType):
+    def register_metric(self, name: str, func: MetricType):
         if name in self.metrics:
             warnings.warn(f"Metric '{name}' already exists in metrics. Overwriting it.")
 
-        self.metrics[name] = metric
-    
+        self.metrics[name] = func
+
     def register_metrics(self, metrics: Dict[str, MetricType]):
-       for name, metric in metrics.items():
-           self.register_metric(name, metric)
+       for name, func in metrics.items():
+           self.register_metric(name, func)
 
     def should_enable_prog_bar(self, phase: Phase):
         if self.disable_prog_bar:
@@ -235,8 +235,8 @@ class AutoModule(L.LightningModule):
         # step_out can be:
         # - a tuple/iterable, all values of which will be fed into the loss function
         #   and that can be used for metric computation
-        # - a dictionary with two keys: "loss" and (optionally) "metrics"
-        # - a dictionary with two keys: "criterion_args" and (optionally) "metrics"
+        # - a dictionary with two keys: "loss" and (optionally) "metrics" that is a Dict of the metric name with the args for the metric function
+        # - a dictionary with two keys: "criterion_args" and (optionally) "metrics" that is a Dict of the metric name with the args for the metric function
         # - a torch tensor (the loss was already computed)
         # - None
         step_out = self.shared_step(phase, *args, **kwargs)
