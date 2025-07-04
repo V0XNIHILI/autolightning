@@ -44,8 +44,6 @@ class AutoModule(L.LightningModule):
         - `self.predict_step(self, batch, batch_idx)`: calls `self.shared_step(batch, batch_idx, "predict")`
         - `self.configure_optimizers(self)`: creates the optimizer and scheduler based on the configuration dictionary
 
-        You can also override `self.config_model(self)`, `self.configure_criteria(self)` and `self.configure_configuration(self, cfg: Dict)` to customize the model and criterion creation and the hyperparameter setting.
-
         Args:
             net (Optional[CriterionNetType], optional): _description_. Defaults to None.
             criterion (Optional[CriterionNetType], optional): _description_. Defaults to None.
@@ -62,6 +60,8 @@ class AutoModule(L.LightningModule):
         self.metrics = {} if metrics == None else metrics
 
         self.register_optimizer(self, optimizer, lr_scheduler)
+
+        self.metrics = self.metrics | self.configure_metrics()
 
         self.loss_log_key = loss_log_key
         self.log_metrics = log_metrics
@@ -195,15 +195,8 @@ class AutoModule(L.LightningModule):
 
         return optimizers, schedulers
 
-    def register_metric(self, name: str, metric: MetricType):
-        if name in self.metrics:
-            warnings.warn(f"Metric '{name}' already exists in metrics. Overwriting it.")
-
-        self.metrics[name] = metric
-    
-    def register_metrics(self, metrics: Dict[str, MetricType]):
-       for name, metric in metrics.items():
-           self.register_metric(name, metric)
+    def configure_metrics(self) -> Dict[str, MetricType]:
+        return {}
 
     def should_enable_prog_bar(self, phase: Phase):
         if self.disable_prog_bar:
@@ -234,29 +227,36 @@ class AutoModule(L.LightningModule):
     def shared_logged_step(self, phase: Phase, *args: Any, **kwargs: Any):
         # step_out can be:
         # - a tuple/iterable, all values of which will be fed into the loss function
-        #   and that can be used for metric computation
-        # - a dictionary with two keys: "loss" and (optionally) "metrics"
-        # - a dictionary with two keys: "criterion_args" and (optionally) "metrics"
+        #   and that can be used for all metric computation
+        # - a dictionary with two keys: "loss" and (optionally) "metrics_args" that is a Dict of the metric name with the args for the metric function
+        # - a dictionary with two keys: "criterion_args" and (optionally) "metrics_args" that is a Dict of the metric name with the args for the metric function
         # - a torch tensor (the loss was already computed)
         # - None
         step_out = self.shared_step(phase, *args, **kwargs)
 
         loss = None
-        metric_inputs = {}
+        metrics_args = None
         log_kwargs = {}
         log_dict = {}
 
         if isinstance(step_out, (tuple, list)):
             loss = self.criterion(*step_out)
-            metric_inputs = step_out
+            metrics_args = step_out
         elif isinstance(step_out, dict):
-            if "loss" in step_out:
+            loss_computed = "loss" in step_out
+            criterion_args_provided = "criterion_args" in step_out
+
+            if loss_computed and criterion_args_provided:
+                raise ValueError("Cannot have both 'loss' and 'criterion_args' in step_out dictionary")
+
+            if loss_computed:
                 loss = step_out["loss"]
-            elif "criterion_args" in step_out:
+            elif criterion_args_provided:
                 loss = self.criterion(*step_out["criterion_args"])
     
             log_kwargs = step_out.get("log_kwargs", {})
             log_dict = step_out.get("log_dict", {})
+            metrics_args = step_out.get("metrics_args", {})
         else:
             loss = step_out
 
@@ -269,24 +269,27 @@ class AutoModule(L.LightningModule):
                 **{f"{phase}/{key}": value for key, value in log_dict.items()}
             }, **main_log_kwargs)
 
-        if isinstance(metric_inputs, dict):
-            for name, inputs in metric_inputs.items():
+        if metrics_args is None:
+            pass # No metrics to log, skip
+        elif isinstance(metrics_args, dict):
+            # If args for metrics are provided, use the per-metric args to compute the metrics
+            for name, inputs in metrics_args.items():
                 key = f"{phase}/{name}"
 
                 metric = self.metrics.get(name, self.metrics[name])
 
                 if isinstance(metric, dict):
-                    self.log(key, metric["metric"](*inputs), **metric["log_kwargs"])
+                    self.log(key, metric["metric"](*inputs), **(dict(prog_bar = prog_bar) | metric["log_kwargs"]))
                 else:
-                    self.log(key, metric(*inputs), prog_bar=prog_bar)
-        else:
+                    self.log(key, metric(*inputs), **main_log_kwargs)
+        else: # if metric_inputs is a tuple/list, use it for all metrics
             for name, metric in self.metrics.items():
                 key = f"{phase}/{name}"
 
                 if isinstance(metric, dict):
-                    self.log(key, metric["metric"](*metric_inputs), **metric["log_kwargs"])
+                    self.log(key, metric["metric"](*metrics_args), **metric["log_kwargs"])
                 else:
-                    self.log(key, metric(*metric_inputs), prog_bar=prog_bar)
+                    self.log(key, metric(*metrics_args), **main_log_kwargs)
 
         return loss
     

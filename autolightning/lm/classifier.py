@@ -17,7 +17,11 @@ class ClassifierMixin:
         super().__init__(criterion=criterion, **kwargs)
 
         self.top_k = top_k
-        self.register_metric("accuracy", partial(calc_accuracy, k=self.top_k))
+
+    def configure_metrics(self):
+        return {
+            "accuracy": partial(calc_accuracy, k=self.top_k),
+        }
         
 
 class Classifier(ClassifierMixin, Supervised):
