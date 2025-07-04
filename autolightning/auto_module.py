@@ -226,7 +226,7 @@ class AutoModule(L.LightningModule):
 
     def shared_logged_step(self, phase: Phase, *args: Any, **kwargs: Any):
         # step_out can be:
-        # - a tuple/iterable, all values of which will be fed into the loss function
+        # - a tuple/iterable, all values of which will be fed into the loss function 
         #   and that can be used for all metric computation
         # - a dictionary with two keys: "loss" and (optionally) "metrics_args" that is a Dict of the metric name with the args for the metric function
         # - a dictionary with two keys: "criterion_args" and (optionally) "metrics_args" that is a Dict of the metric name with the args for the metric function
