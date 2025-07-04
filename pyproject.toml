@@ -18,6 +18,7 @@ dependencies = [
   'torchvision',
   'lightning',
   'torchmetrics',
+  'scikit-learn',
   "jsonargparse[signatures]<= 4.33.2",
   'omegaconf',
   "typing_extensions; python_version < '3.11'",
