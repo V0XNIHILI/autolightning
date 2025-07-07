@@ -11,11 +11,16 @@ from torch.optim.optimizer import Optimizer
 from torchmetrics.metric import Metric
 from lightning.pytorch.cli import OptimizerCallable, LRSchedulerCallable
 
-
 MetricType = Dict[str, Union[Metric, Callable[..., Any]]]
 OptimizerType = Union[Optimizer, OptimizerCallable, Iterable[Union[Optimizer, OptimizerCallable]], Dict[str, OptimizerCallable]]
 LrSchedulerType = Union[LRSchedulerCallable, Dict]
 IterableOfModules = Iterable[nn.Module]
+
+try:
+    from transformers.models.auto.auto_factory import _BaseAutoModelClass as BAMC
+except ImportError:
+    BAMC = nn.Module  # fallback type
+NetType = Union[nn.Module, BAMC]
 
 CallableOrModule = Union[Callable, nn.Module]
 TransformValue = Union[List[CallableOrModule], CallableOrModule]
@@ -24,7 +29,7 @@ Phase = Literal["train", "val", "test"]
 
 
 class AutoModuleKwargs(TypedDict, total=False):
-    net: Optional[nn.Module]
+    net: Optional[NetType]
     criterion: Optional[nn.Module]
     optimizer: Optional[OptimizerType]
     lr_scheduler: Optional[LrSchedulerType]
@@ -36,7 +41,7 @@ class AutoModuleKwargs(TypedDict, total=False):
 
 
 class AutoModuleKwargsNoCriterion(TypedDict, total=False):
-    net: Optional[nn.Module]
+    net: Optional[NetType]
     optimizer: Optional[OptimizerType]
     lr_scheduler: Optional[LrSchedulerType]
     metrics: Optional[MetricType]

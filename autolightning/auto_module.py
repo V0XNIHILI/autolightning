@@ -10,7 +10,7 @@ from pytorch_lightning.utilities.types import OptimizerLRScheduler
 
 from lightning.pytorch.cli import OptimizerCallable
 
-from .types import MetricType, OptimizerType, LrSchedulerType, Phase
+from .types import MetricType, OptimizerType, LrSchedulerType, NetType, Phase
 
 
 LOG_PHASE_KEYS = {"train", "val", "test", "predict"}
@@ -39,7 +39,7 @@ def _resolve_metric(metric, default_log_kwargs: Dict[str, Any]) -> Callable:
 
 class AutoModule(L.LightningModule):
     def __init__(self,
-                 net: Optional[nn.Module] = None,
+                 net: Optional[NetType] = None,
                  criterion: Optional[nn.Module] = None,
                  optimizer: Optional[OptimizerType] = None,
                  lr_scheduler: Optional[LrSchedulerType] = None,

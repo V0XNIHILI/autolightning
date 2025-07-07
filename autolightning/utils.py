@@ -71,6 +71,25 @@ def sequential(modules: List[nn.Module]) -> nn.Sequential:
     return nn.Sequential(*modules) if modules else nn.Sequential()
 
 
+try:
+    from transformers import PretrainedConfig
+    from transformers.models.auto.auto_factory import _BaseAutoModelClass
+
+    def from_transformers_config(
+        auto_model: str,
+        config: PretrainedConfig,
+        auto_model_kwargs: Optional[Dict[str, Any]] = None
+    ) -> _BaseAutoModelClass:
+        model_class = _import_module(f"transformers.{auto_model}")
+        return model_class.from_config(config, **(auto_model_kwargs or {}))
+
+except ImportError:
+    def from_transformers_config(auto_mode: str, config: Any, auto_model_kwargs: Optional[Dict[str, Any]] = None) -> Any:
+        raise ImportError(
+            "The 'transformers' library is not installed. "
+            "Please install it to use the 'from_transformers_config' function."
+        )
+
 def disable_grad(module: nn.Module) -> nn.Module:
     for param in module.parameters():
         param.requires_grad = False
