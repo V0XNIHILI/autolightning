@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Any, Iterator, Union, Callable
+from typing import Dict, Optional, Any, Iterator, Union, Callable, Tuple
 import warnings
 
 import torch.nn as nn
@@ -26,7 +26,7 @@ def _call_with_flexible_args(func: Callable, args: Any) -> Any:
     raise TypeError(f"Invalid argument type: {type(args)}")
 
 
-def _resolve_metric(metric, default_log_kwargs: Dict[str, Any]) -> Callable:
+def _resolve_metric(metric, default_log_kwargs: Dict[str, Any]) -> Tuple[Union[Callable, Any], Dict[str, Any]]:
     metric_func_or_value = metric
     metric_specific_log_kwargs = default_log_kwargs
 
@@ -254,7 +254,7 @@ class AutoModule(L.LightningModule):
 
         step_out = self.shared_step(phase, *args, **kwargs)
 
-        default_log_kwargs = dict(prog_bar=self.should_enable_prog_bar(phase))
+        default_log_kwargs: Dict[str, Any] = dict(prog_bar=self.should_enable_prog_bar(phase))
         loss = None
 
         if isinstance(step_out, (tuple, list)):
