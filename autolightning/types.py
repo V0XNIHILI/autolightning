@@ -93,3 +93,16 @@ class AutoDataModuleKwargsNoDatasetPrepareSplit(TypedDict, total=False):
     pre_load: Union[Dict[str, bool], bool]
     cross_val: Optional[Dict[str, int]]
     seed: Optional[int]
+
+
+class ClassifierKwargs(TypedDict, total=False):
+    top_k: int
+    net: Optional[NetType]
+    criterion: Optional[nn.Module]
+    optimizer: Optional[OptimizerType]
+    lr_scheduler: Optional[LrSchedulerType]
+    metrics: Optional[MetricType]
+    loss_log_key: Optional[str]
+    log_metrics: bool
+    exclude_no_grad: bool
+    disable_prog_bar: bool
