@@ -214,7 +214,7 @@ class AutoModule(L.LightningModule):
 
         return optimizers, schedulers
 
-    def configure_metrics(self) -> Dict[str, MetricType]:
+    def configure_metrics(self) -> MetricType:
         return {}
 
     def should_enable_prog_bar(self, phase: Phase):
