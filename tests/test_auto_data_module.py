@@ -211,3 +211,6 @@ def test_post_init_dataset_per_phase():
 
     for i in range(len(test_ds)):
         assert test_ds[i] == val_ds_manually[i]
+
+
+# TODO: test correct init for datasets and not initing them twice

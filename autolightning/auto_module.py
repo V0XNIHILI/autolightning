@@ -226,7 +226,7 @@ class AutoModule(L.LightningModule):
 
     def shared_logged_step(self, phase: Phase, *args: Any, **kwargs: Any):
         # step_out can be:
-        # - a tuple/iterable, all values of which will be fed into the loss function 
+        # - a tuple/iterable, all values of which will be fed into the loss function
         #   and that can be used for all metric computation
         # - a dictionary with two keys: "loss" and (optionally) "metrics_args" that is a Dict of the metric name with the args for the metric function
         # - a dictionary with two keys: "criterion_args" and (optionally) "metrics_args" that is a Dict of the metric name with the args for the metric function
@@ -235,7 +235,7 @@ class AutoModule(L.LightningModule):
         step_out = self.shared_step(phase, *args, **kwargs)
 
         loss = None
-        metrics_args = None
+        metrics_args = {}
         log_kwargs = {}
         log_dict = {}
 
@@ -256,7 +256,7 @@ class AutoModule(L.LightningModule):
     
             log_kwargs = step_out.get("log_kwargs", {})
             log_dict = step_out.get("log_dict", {})
-            metrics_args = step_out.get("metrics_args", {})
+            metrics_args = step_out.get("metrics_args", step_out.get("metric_inputs", {}))
         else:
             loss = step_out
 
@@ -269,10 +269,7 @@ class AutoModule(L.LightningModule):
                 **{f"{phase}/{key}": value for key, value in log_dict.items()}
             }, **main_log_kwargs)
 
-        if metrics_args is None:
-            pass # No metrics to log, skip
-        elif isinstance(metrics_args, dict):
-            # If args for metrics are provided, use the per-metric args to compute the metrics
+        if isinstance(metrics_args, dict):
             for name, inputs in metrics_args.items():
                 key = f"{phase}/{name}"
 
