@@ -3,7 +3,7 @@ import os
 import tempfile
 import yaml
 import importlib
-from typing import Dict, Any, Union, List, Tuple, Optional, Literal
+from typing import Dict, Any, Union, List, Tuple, Optional, Literal, Callable
 
 from jsonargparse import ActionConfigFile
 
@@ -17,7 +17,7 @@ from torch_mate.utils import disable_torch_debug_apis, configure_cuda
 
 
 def cc(class_path: str, init_args: Optional[dict] = None, **kwargs: Any):
-    out = {"class_path": class_path}
+    out: Dict[str, Any] = {"class_path": class_path}
 
     # Use dict kwargs instead of init_args since both "autolightning.optim" and "autolightning.sched"
     # do not have named arguments but only **kwargs. The Lightning CLI does support that, but it requires
@@ -112,7 +112,7 @@ class ActionConfigFilePython(ActionConfigFile):
             else:
                 config_name = "config"
 
-            variable = getattr(module, config_name)
+            variable: Union[Callable[[], Dict], Dict] = getattr(module, config_name)
 
             if callable(variable):
                 variable = variable()
