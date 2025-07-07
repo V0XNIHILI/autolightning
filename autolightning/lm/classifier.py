@@ -14,9 +14,9 @@ class ClassifierMixin:
         if criterion == None:
             criterion = nn.CrossEntropyLoss()
 
-        super().__init__(criterion=criterion, **kwargs)
-
         self.top_k = top_k
+
+        super().__init__(criterion=criterion, **kwargs)
 
     def configure_metrics(self):
         return {
