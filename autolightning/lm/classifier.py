@@ -16,7 +16,7 @@ class ClassifierMixin:
 
         self.top_k = top_k
 
-        super().__init__(criterion=criterion, **kwargs)
+        super().__init__(criterion=criterion, **kwargs) # type: ignore
 
     def configure_metrics(self):
         return {
