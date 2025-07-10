@@ -25,7 +25,7 @@ NetType = Union[nn.Module, BAMC]
 CallableOrModule = Union[Callable, nn.Module]
 TransformValue = Union[List[CallableOrModule], CallableOrModule]
 
-Phase = Literal["train", "val", "test"]
+Phase = Literal["train", "val", "test", "pred"]
 
 
 class AutoModuleKwargs(TypedDict, total=False):
