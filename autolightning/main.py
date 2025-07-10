@@ -62,7 +62,7 @@ def auto_main(config: Optional[Union[List[dict], dict]] = None, subcommand: Opti
     return cli.trainer, cli.model, cli.datamodule
 
 
-def auto_data(config: Union[List[dict], dict], includes_data_key: bool = True):
+def auto_data(config: Union[List[dict], dict], config_includes_data_key: bool = True):
     final_config = {}
 
     if isinstance(config, list):
@@ -71,7 +71,7 @@ def auto_data(config: Union[List[dict], dict], includes_data_key: bool = True):
     else:
         final_config = config
 
-    if not includes_data_key:
+    if not config_includes_data_key:
         final_config = {"data": final_config}
     else:
         final_config["trainer"] = {}
