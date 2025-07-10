@@ -223,13 +223,6 @@ class AutoModule(L.LightningModule):
 
         return phase == 'val'
 
-    def forward(self, *args: Any, **kwargs: Any) -> Any:
-        """The forward step in an `AutoModule` ideally implements ONLY the forward pass through the network,
-        returning the output of the network that can directly be fed into the criterion.
-        """
-
-        raise NotImplementedError
-    
     def shared_step(self, phase: Phase, *args, **kwargs):
         """A call to shared_step should result in either:
 
