@@ -471,10 +471,6 @@ analysis = tune.run(tune_function, config=search_space)
 - [**`Supervised`**](./autolightning/lm/supervised.py): General supervised learning
 - [**`Classifier`**](./autolightning/lm/classifier.py): Classification tasks
 
-#### Self-supervised Learning
-- [**`Triplet`**](./autolightning/lm/self_supervised.py): Siamese networks for similarity learning
-- [**`Triplet`**](./autolightning/lm/self_supervised.py): Triplet networks for ranking tasks
-
 #### Knowledge Distillation
 - [**`Distilled`**](./autolightning/lm/distilled.py): Knowledge distillation with optional student head and regressor
 
@@ -589,7 +585,7 @@ autolightning adds several hooks to the standard Lightning model:
 
 - **`parameters_for_optimizer(self, recurse: bool = True)`**: Control which parameters are used for optimization
 - **`register_optimizer(self, module: nn.Module, optimizer, lr_scheduler)`**: Register optimizers and schedulers
-- **`register_metric(self, name: str, metric)`**: Register evaluation metrics
+- **`configure_metrics(self)`**: Return a dict of metrics
 - **`shared_step(self, phase: Phase, *args, **kwargs)`**: Core step function for all phases
 - **`shared_logged_step(self, phase: Phase, *args: Any, **kwargs: Any)`**: Logging-aware step function
 
