@@ -5,7 +5,11 @@ from autolightning.auto_cli import LoggerSaveConfigCallback
 from autolightning.utils import merge_dicts
 
 
-def auto_main(config: Optional[Union[List[dict], dict]] = None, subcommand: Optional[str] = None, run: bool = True):
+def auto_main(
+    config: Optional[Union[List[dict], dict]] = None,
+    subcommand: Optional[str] = None,
+    run: bool = True,
+):
     final_config = None
     main_config = {}
 
@@ -39,7 +43,7 @@ def auto_main(config: Optional[Union[List[dict], dict]] = None, subcommand: Opti
         subclass_mode_model=True,
         save_config_kwargs={"overwrite": True},
         parser_kwargs={"parser_mode": "omegaconf"},
-        save_config_callback=LoggerSaveConfigCallback
+        save_config_callback=LoggerSaveConfigCallback,
     )
 
     return cli.trainer, cli.model, cli.datamodule

@@ -5,7 +5,12 @@ import warnings
 import lightning as L
 
 import torch
-from torch.utils.data import DataLoader, Dataset, IterableDataset, random_split as torch_random_split
+from torch.utils.data import (
+    DataLoader,
+    Dataset,
+    IterableDataset,
+    random_split as torch_random_split,
+)
 from torchvision.transforms import Compose
 
 from jsonargparse import Namespace
@@ -28,13 +33,17 @@ AllDatasetsType = Union[Dataset, IterableDataset]
 TransformType = Union[Dict[str, TransformValue], TransformValue]
 
 
-def instantiate_datasets(dataset: Optional[Union[Dict[str, Dataset], Dict, Dataset]]) -> (Dataset | Dict[str, Dataset] | None):
+def instantiate_datasets(
+    dataset: Optional[Union[Dict[str, Dataset], Dict, Dataset]],
+) -> Dataset | Dict[str, Dataset] | None:
     if dataset is None or isinstance(dataset, Dataset) or isinstance(dataset, IterableDataset):
         return dataset
 
     if not isinstance(dataset, dict):
-        raise ValueError(f"Unsupported dataset configuration: {dataset}; can either be None, a Dataset instance or a dictionary")
-    
+        raise ValueError(
+            f"Unsupported dataset configuration: {dataset}; can either be None, a Dataset instance or a dictionary"
+        )
+
     # If the dictionary has any of the phases, then it is a dictionary of datasets per stage
     if any(key in dataset for key in PHASES):
         dataset_dict = {}
@@ -42,11 +51,14 @@ def instantiate_datasets(dataset: Optional[Union[Dict[str, Dataset], Dict, Datas
         for key, ds in dataset.items():
             if key not in PHASES:
                 raise ValueError(f"Unsupported phase key in dataset configuration: {key}")
-            
+
             if isinstance(ds, Dataset):
                 dataset_dict[key] = ds
             elif "class_name" in ds:
-                init = {"class_path": ds["class_name"], "init_args": ds.get(ARGS_KEY, {})}
+                init = {
+                    "class_path": ds["class_name"],
+                    "init_args": ds.get(ARGS_KEY, {}),
+                }
 
                 if type(init["class_path"]) is str:
                     dataset_dict[key] = instantiate_class(tuple(), init)
@@ -55,10 +67,12 @@ def instantiate_datasets(dataset: Optional[Union[Dict[str, Dataset], Dict, Datas
 
                 dataset_dict[key] = instantiate_class(tuple(), init)
             else:
-                raise ValueError(f"Unsupported dataset configuration; should be a Dataset instance or a dictionary with a 'class_name' key: {ds}")
+                raise ValueError(
+                    f"Unsupported dataset configuration; should be a Dataset instance or a dictionary with a 'class_name' key: {ds}"
+                )
 
         return dataset_dict
-    
+
     if "class_name" in dataset:
         init = {"class_path": dataset["class_name"]}
 
@@ -68,16 +82,22 @@ def instantiate_datasets(dataset: Optional[Union[Dict[str, Dataset], Dict, Datas
             init["class_path"] = dict(init["class_path"])["class_path"]
 
         # If any of the keys "train", "val", "test" or "predict" are present and they are all dictionaries, we build the datasets separately
-        if ARGS_KEY in dataset and any(key in ALLOWED_DATASET_KEYS for key in dataset[ARGS_KEY].keys()) and all(isinstance(phase_val, dict) for phase_val in dataset[ARGS_KEY].values()):
+        if (
+            ARGS_KEY in dataset
+            and any(key in ALLOWED_DATASET_KEYS for key in dataset[ARGS_KEY].keys())
+            and all(isinstance(phase_val, dict) for phase_val in dataset[ARGS_KEY].values())
+        ):
             # Make sure no other keys are present except for the stages
-            assert set(dataset[ARGS_KEY].keys()) - set(ALLOWED_DATASET_KEYS) == set(), f"Unsupported keys in dataset configuration: {set(dataset['args'].keys()) - set(ALLOWED_DATASET_KEYS)}"
+            assert set(dataset[ARGS_KEY].keys()) - set(ALLOWED_DATASET_KEYS) == set(), (
+                f"Unsupported keys in dataset configuration: {set(dataset['args'].keys()) - set(ALLOWED_DATASET_KEYS)}"
+            )
 
             defaults = dataset[ARGS_KEY].get("defaults", {})
 
             dataset_dict = {}
 
             contains_all_keys = all(key in dataset[ARGS_KEY] for key in ALLOWED_DATASET_KEYS)
-            
+
             for key in dataset[ARGS_KEY].keys():
                 # If all stage keys are present, then there is no need to instantiate the default dataset
                 if contains_all_keys and key == "defaults":
@@ -91,26 +111,28 @@ def instantiate_datasets(dataset: Optional[Union[Dict[str, Dataset], Dict, Datas
                     dataset_dict[key] = init["class_path"](**init["init_args"])
 
             return dataset_dict
-        
+
         return instantiate_class(tuple(), init | {"init_args": dataset.get(ARGS_KEY, {})})
-    
-    raise ValueError(f"Unsupported dataset configuration: {dataset}; should either be a dataset instance, a dictionary with a 'class_name' key or a dictionary with dataset instances for one ore more phases")
+
+    raise ValueError(
+        f"Unsupported dataset configuration: {dataset}; should either be a dataset instance, a dictionary with a 'class_name' key or a dictionary with dataset instances for one ore more phases"
+    )
 
 
 def compose_if_list(tf: Optional[TransformValue]) -> Optional[Callable]:
     if type(tf) is list:
         if len(tf) == 0:
             return None
-        
+
         if len(tf) == 1:
             return tf[0]
-        
+
         return Compose(tf)
-    
+
     return tf
 
 
-def build_transform(phase: str, transforms: TransformType) -> (Callable | None):
+def build_transform(phase: str, transforms: TransformType) -> Callable | None:
     if type(transforms) is not dict:
         return compose_if_list(transforms)
 
@@ -130,20 +152,20 @@ def iteratively_apply_transform(batch, transforms):
             batch = tf(batch)
     else:
         batch = transforms(batch)
-    
+
     return batch
 
 
 def apply_batch_transforms(batch, key: str, transforms: dict, target_batch_transforms: Union[dict, str]):
     tf = transforms.get(key, None)
-    
+
     def id(x):
         return x
 
     if tf is not None:
         if target_batch_transforms == "combine":
             return iteratively_apply_transform(batch, tf)
-        
+
         tft = target_batch_transforms.get(key, None) or id
 
         x, y = batch
@@ -153,7 +175,7 @@ def apply_batch_transforms(batch, key: str, transforms: dict, target_batch_trans
     # If tf is already None and target_batch_transforms is also not specified, we return the batch as is
     if target_batch_transforms == "combine":
         return batch
-    
+
     tft = target_batch_transforms.get(key, None) or id
 
     x, y = batch
@@ -162,19 +184,20 @@ def apply_batch_transforms(batch, key: str, transforms: dict, target_batch_trans
 
 
 class AutoDataModule(L.LightningDataModule):
-
-    def __init__(self,
-                 dataset: Optional[Union[Dict[str, AllDatasetsType], AllDatasetsType]] = None,
-                 dataloaders: Optional[Dict] = None,
-                 transforms: Optional[TransformType] = None,
-                 target_transforms: Optional[TransformType] = None,
-                 batch_transforms: Optional[TransformType] = None,
-                 target_batch_transforms: Optional[Union[TransformType, Literal["combine"]]] = "combine",
-                 requires_prepare: bool = True,
-                 pre_load: Union[Dict[str, bool], bool] = False,
-                 random_split: Optional[Dict[str, Union[int, float]]] = None,
-                 cross_val: Optional[Dict[str, int]] = None,
-                 seed: Optional[int] = 42):
+    def __init__(
+        self,
+        dataset: Optional[Union[Dict[str, AllDatasetsType], AllDatasetsType]] = None,
+        dataloaders: Optional[Dict] = None,
+        transforms: Optional[TransformType] = None,
+        target_transforms: Optional[TransformType] = None,
+        batch_transforms: Optional[TransformType] = None,
+        target_batch_transforms: Optional[Union[TransformType, Literal["combine"]]] = "combine",
+        requires_prepare: bool = True,
+        pre_load: Union[Dict[str, bool], bool] = False,
+        random_split: Optional[Dict[str, Union[int, float]]] = None,
+        cross_val: Optional[Dict[str, int]] = None,
+        seed: Optional[int] = 42,
+    ):
         """Lightweight wrapper around PyTorch Lightning LightningDataModule that adds support for configuration via a dictionary.
 
         Overall, compared to the PyTorch Lightning LightningModule, the following two attributes are added:
@@ -196,7 +219,7 @@ class AutoDataModule(L.LightningDataModule):
                 If a dictionary is specified, it must contain one or more of the keys `train`, `val`, `test` and
                 `pred` to specify whether to pre-load the respective dataset. If a boolean is specified, it will
                 be used as the default value for all phases.
-            random_split (Optional[Dict[str, Union[int, float]]]): 
+            random_split (Optional[Dict[str, Union[int, float]]]):
                 A dictionary that specifies how to split the dataset into `train`, `val`, `test` and `pred` sets.
                 For each of these keys, it is possible to specify either a float or an integer to indicate the
                 percentage or the number of samples to be used for the respective set. It is also possible split
@@ -233,7 +256,7 @@ class AutoDataModule(L.LightningDataModule):
         self.seed = seed
 
         self.instantiated_dataset: Union[Dataset, Dict[str, Dataset]] = {}
-        
+
     def prepare_data(self) -> None:
         if self.requires_prepare:
             instantiate_datasets(self.dataset)
@@ -243,23 +266,23 @@ class AutoDataModule(L.LightningDataModule):
 
     def get_target_transform(self, stage: str):
         return build_transform(stage, self.target_transforms)
-    
+
     def setup(self, stage: str):
         datasets = instantiate_datasets(self.dataset)
 
         if datasets is None:
             return
-        
+
         relevant_phases = []
 
-        if stage == 'fit':
-            relevant_phases = ['train', 'val']
-        elif stage == 'test':
-            relevant_phases = ['test']
-        elif stage == 'predict':
-            relevant_phases = ['pred']
-        elif stage == 'validate':
-            relevant_phases = ['val']
+        if stage == "fit":
+            relevant_phases = ["train", "val"]
+        elif stage == "test":
+            relevant_phases = ["test"]
+        elif stage == "predict":
+            relevant_phases = ["pred"]
+        elif stage == "validate":
+            relevant_phases = ["val"]
 
         generator = torch.Generator()
 
@@ -269,26 +292,38 @@ class AutoDataModule(L.LightningDataModule):
         if isinstance(datasets, Dataset):
             if self.cross_val:
                 if not isinstance(self.cross_val, dict):
-                    raise TypeError(f"Unsupported cross-validation configuration: {self.cross_val}; must be a dictionary")
+                    raise TypeError(
+                        f"Unsupported cross-validation configuration: {self.cross_val}; must be a dictionary"
+                    )
 
-                assert self.cross_val[N_FOLDS_KEY] > self.cross_val[FOLD_IDX_KEY] >= 0, f"Invalid fold index {self.cross_val['fold']} for {self.cross_val['n_folds']} splits"
+                assert self.cross_val[N_FOLDS_KEY] > self.cross_val[FOLD_IDX_KEY] >= 0, (
+                    f"Invalid fold index {self.cross_val['fold']} for {self.cross_val['n_folds']} splits"
+                )
 
                 from sklearn.model_selection import KFold
 
                 shuffle = self.seed is not None
 
-                kf = KFold(n_folds=self.cross_val[N_FOLDS_KEY], shuffle=shuffle, random_state=self.seed)
+                kf = KFold(
+                    n_folds=self.cross_val[N_FOLDS_KEY],
+                    shuffle=shuffle,
+                    random_state=self.seed,
+                )
 
                 for i, (train_indices, val_indices) in enumerate(kf.split(datasets)):
                     if i == self.cross_val[FOLD_IDX_KEY]:
-                        self.instantiated_dataset['train'] = torch.utils.data.Subset(datasets, train_indices)
-                        self.instantiated_dataset['val'] = torch.utils.data.Subset(datasets, val_indices)
+                        self.instantiated_dataset["train"] = torch.utils.data.Subset(datasets, train_indices)
+                        self.instantiated_dataset["val"] = torch.utils.data.Subset(datasets, val_indices)
                         break
             elif self.random_split:
                 if not isinstance(self.random_split, dict):
-                    raise TypeError(f"Unsupported random split configuration: {self.random_split}; must be a dictionary")
+                    raise TypeError(
+                        f"Unsupported random split configuration: {self.random_split}; must be a dictionary"
+                    )
 
-                assert set(self.random_split.keys()) - set(PHASES) == set(), f"Unsupported keys in random split configuration: {set(self.random_split.keys()) - set(PHASES)}"
+                assert set(self.random_split.keys()) - set(PHASES) == set(), (
+                    f"Unsupported keys in random split configuration: {set(self.random_split.keys()) - set(PHASES)}"
+                )
 
                 dataset_splits = torch_random_split(datasets, self.random_split.values(), generator=generator)
                 datasets = dict(zip(self.random_split.keys(), dataset_splits))
@@ -297,9 +332,11 @@ class AutoDataModule(L.LightningDataModule):
                     self.instantiated_dataset[phase_key] = datasets[phase_key]
             else:
                 for phase_key in relevant_phases:
-                    if phase_key != 'train':
-                        warnings.warn(f"Only one dataset was specified, but it will be used for multiple phases: {relevant_phases}")
-            
+                    if phase_key != "train":
+                        warnings.warn(
+                            f"Only one dataset was specified, but it will be used for multiple phases: {relevant_phases}"
+                        )
+
                     self.instantiated_dataset[phase_key] = datasets
         else:
             instantiate_dataset_keys = []
@@ -312,34 +349,50 @@ class AutoDataModule(L.LightningDataModule):
                 new_phase_key = "defaults" if is_default else phase_key
 
                 if is_default and "defaults" not in datasets:
-                    raise ValueError(f"Phase key {phase_key} not found in dataset configuration; also no defaults found")
+                    raise ValueError(
+                        f"Phase key {phase_key} not found in dataset configuration; also no defaults found"
+                    )
 
                 dataset = datasets[new_phase_key]
-                    
+
                 if is_default and (self.random_split is not None or self.cross_val is not None):
                     if self.cross_val:
                         if not isinstance(self.cross_val, dict):
-                            raise TypeError(f"Unsupported cross-validation configuration: {self.cross_val}; must be a dictionary")
+                            raise TypeError(
+                                f"Unsupported cross-validation configuration: {self.cross_val}; must be a dictionary"
+                            )
 
-                        assert self.cross_val[N_FOLDS_KEY] > self.cross_val[FOLD_IDX_KEY] >= 0, f"Invalid fold index {self.cross_val['fold']} for {self.cross_val['n_folds']} splits"
+                        assert self.cross_val[N_FOLDS_KEY] > self.cross_val[FOLD_IDX_KEY] >= 0, (
+                            f"Invalid fold index {self.cross_val['fold']} for {self.cross_val['n_folds']} splits"
+                        )
 
                         from sklearn.model_selection import KFold
 
                         shuffle = self.seed is not None
 
-                        kf = KFold(n_folds=self.cross_val[N_FOLDS_KEY], shuffle=shuffle, random_state=self.seed)
+                        kf = KFold(
+                            n_folds=self.cross_val[N_FOLDS_KEY],
+                            shuffle=shuffle,
+                            random_state=self.seed,
+                        )
 
                         for i, (train_indices, val_indices) in enumerate(kf.split(dataset)):
                             if i == self.cross_val[FOLD_IDX_KEY]:
-                                self.instantiated_dataset['train'] = torch.utils.data.Subset(dataset, train_indices)
-                                self.instantiated_dataset['val'] = torch.utils.data.Subset(dataset, val_indices)
-                                instantiate_dataset_keys.extend(['train', 'val'])
+                                self.instantiated_dataset["train"] = torch.utils.data.Subset(dataset, train_indices)
+                                self.instantiated_dataset["val"] = torch.utils.data.Subset(dataset, val_indices)
+                                instantiate_dataset_keys.extend(["train", "val"])
                     else:
                         # Cannot create a random split for a dataset that is already specified
-                        assert set(datasets.keys()).isdisjoint(set(self.random_split.keys())), f"Random split configuration contains keys that are already present in the dataset configuration: {set(datasets.keys()) & set(self.random_split.keys())}"
+                        assert set(datasets.keys()).isdisjoint(set(self.random_split.keys())), (
+                            f"Random split configuration contains keys that are already present in the dataset configuration: {set(datasets.keys()) & set(self.random_split.keys())}"
+                        )
 
-                        dataset_splits = torch_random_split(dataset, self.random_split["dest"].values(), generator=generator)
-                        
+                        dataset_splits = torch_random_split(
+                            dataset,
+                            self.random_split["dest"].values(),
+                            generator=generator,
+                        )
+
                         new_datasets = dict(zip(self.random_split["dest"].keys(), dataset_splits))
 
                         for split_key, split_dataset in new_datasets.items():
@@ -352,17 +405,19 @@ class AutoDataModule(L.LightningDataModule):
 
     def get_dataset(self, phase: Phase) -> Union[Dataset, IterableDataset]:
         if phase not in self.instantiated_dataset:
-            raise KeyError(f"Dataset for phase {phase} not found; make sure to call `setup` before accessing the dataset")
-            
+            raise KeyError(
+                f"Dataset for phase {phase} not found; make sure to call `setup` before accessing the dataset"
+            )
+
         return self.instantiated_dataset[phase]
-    
+
     def get_transformed_dataset(self, phase: Phase):
         dataset = self.get_dataset(phase)
 
         if self.pre_load or (isinstance(self.pre_load, dict) and self.pre_load.get(phase, False)):
             pre_load_tf = None
             pre_load_target_tf = None
-    
+
             if isinstance(self.transforms, dict):
                 pre_load_tf = compose_if_list(self.transforms.get(PRE_LOAD_MOMENT, None))
                 pre_load_target_tf = compose_if_list(self.target_transforms.get(PRE_LOAD_MOMENT, None))
@@ -383,51 +438,45 @@ class AutoDataModule(L.LightningDataModule):
         if transform is None and target_transform is None:
             return dataset
 
-        if not hasattr(dataset, '__len__'):
+        if not hasattr(dataset, "__len__"):
             return TransformedIterable(dataset, transform, target_transform)
         else:
             return Transformed(dataset, transform, target_transform)
-        
+
     def get_dataloader_kwargs(self, phase: Phase):
         # If the dataloader configuration is specified per phase...
         if any(key in self.dataloaders for key in ALLOWED_DATASET_KEYS):
             unsupported_keys = set(self.dataloaders.keys()) - set(ALLOWED_DATASET_KEYS)
 
-            assert unsupported_keys == set(), f"Unsupported keys in dataloader configuration: {unsupported_keys}; only {ALLOWED_DATASET_KEYS} are allowed"
+            assert unsupported_keys == set(), (
+                f"Unsupported keys in dataloader configuration: {unsupported_keys}; only {ALLOWED_DATASET_KEYS} are allowed"
+            )
 
             kwargs = self.dataloaders.get("defaults", {}) | self.dataloaders.get(phase, {})
         else:
             kwargs = self.dataloaders
 
         return kwargs
-    
+
     def get_dataloader(self, phase: Phase):
         dataset = self.get_transformed_dataset(phase)
         kwargs = self.get_dataloader_kwargs(phase)
         return DataLoader(dataset, **kwargs)
 
     def train_dataloader(self):
-        return self.get_dataloader('train')
-    
+        return self.get_dataloader("train")
+
     def val_dataloader(self):
-        return self.get_dataloader('val')
-    
+        return self.get_dataloader("val")
+
     def test_dataloader(self):
-        return self.get_dataloader('test')
-    
+        return self.get_dataloader("test")
+
     def predict_dataloader(self):
-        return self.get_dataloader('pred')
-    
+        return self.get_dataloader("pred")
+
     def on_before_batch_transfer(self, batch, dataloader_idx: int):
-        return apply_batch_transforms(
-            batch, "before",
-            self.batch_transforms,
-            self.target_batch_transforms
-        )
-    
+        return apply_batch_transforms(batch, "before", self.batch_transforms, self.target_batch_transforms)
+
     def on_after_batch_transfer(self, batch, dataloader_idx: int):
-        return apply_batch_transforms(
-            batch, "after",
-            self.batch_transforms,
-            self.target_batch_transforms
-        )
+        return apply_batch_transforms(batch, "after", self.batch_transforms, self.target_batch_transforms)

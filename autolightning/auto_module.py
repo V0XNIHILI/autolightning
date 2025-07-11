@@ -15,7 +15,16 @@ from .types import MetricType, OptimizerType, LrSchedulerType, NetType, Phase
 
 LOG_PHASE_KEYS = {"train", "val", "test", "predict"}
 LOG_ORDER_OPTIONS = {"phase_first", "metric_first"}
-KEYS_TO_IGNORE = ["net", "criterion", "metrics", "optimizer", "compiler", "metrics", "loss_log_key", "log_metrics"]
+KEYS_TO_IGNORE = [
+    "net",
+    "criterion",
+    "metrics",
+    "optimizer",
+    "compiler",
+    "metrics",
+    "loss_log_key",
+    "log_metrics",
+]
 
 
 def _call_with_flexible_args(func: Callable, args: Any) -> Any:
@@ -38,20 +47,22 @@ def _resolve_metric(metric, default_log_kwargs: Dict[str, Any]) -> Tuple[Union[C
 
 
 class AutoModule(L.LightningModule):
-    def __init__(self,
-                 net: Optional[NetType] = None,
-                 criterion: Optional[nn.Module] = None,
-                 optimizer: Optional[OptimizerType] = None,
-                 lr_scheduler: Optional[LrSchedulerType] = None,
-                 metrics: Optional[MetricType] = None,
-                 loss_log_key: Optional[str] = "loss",
-                 log_metrics: bool = True,
-                 exclude_no_grad: bool = True,
-                 disable_prog_bar: bool = False):
+    def __init__(
+        self,
+        net: Optional[NetType] = None,
+        criterion: Optional[nn.Module] = None,
+        optimizer: Optional[OptimizerType] = None,
+        lr_scheduler: Optional[LrSchedulerType] = None,
+        metrics: Optional[MetricType] = None,
+        loss_log_key: Optional[str] = "loss",
+        log_metrics: bool = True,
+        exclude_no_grad: bool = True,
+        disable_prog_bar: bool = False,
+    ):
         """Lightweight wrapper around PyTorch Lightning LightningModule that adds support for a configuration dictionary.
         Based on this configuration, it creates the model, criterion, optimizer, and scheduler. Overall, compared to the
         PyTorch Lightning LightningModule, the following three attributes are added:
-        
+
         - `self.criterion`: the created criterion
         - `self.shared_step(self, batch, batch_idx, phase)`: a generic step function that is shared across all steps (train, val, test, predict)
 
@@ -101,10 +112,17 @@ class AutoModule(L.LightningModule):
         else:
             yield from params
 
-    def register_optimizer(self, module: nn.Module, optimizer: Optional[OptimizerCallable] = None, lr_scheduler: Optional[LrSchedulerType] = None):
+    def register_optimizer(
+        self,
+        module: nn.Module,
+        optimizer: Optional[OptimizerCallable] = None,
+        lr_scheduler: Optional[LrSchedulerType] = None,
+    ):
         if optimizer is not None:
             if module in self.optimizers_schedulers:
-                warnings.warn(f"Optimizer for module '{module}' already exists in optimizers_schedulers. Overwriting it.")
+                warnings.warn(
+                    f"Optimizer for module '{module}' already exists in optimizers_schedulers. Overwriting it."
+                )
 
             self.optimizers_schedulers[module] = (optimizer, lr_scheduler)
         elif lr_scheduler is not None:
@@ -147,7 +165,9 @@ class AutoModule(L.LightningModule):
 
                         schedulers.append(init_sched)
                     else:
-                        raise TypeError(f"Invalid scheduler type: {type(scheduler)}; expected either a scheduler or a callable")
+                        raise TypeError(
+                            f"Invalid scheduler type: {type(scheduler)}; expected either a scheduler or a callable"
+                        )
             elif callable(optimizer):
                 params = self.parameters_for_optimizer() if module == self else module.parameters()
                 optimizers.append(optimizer(params))
@@ -198,15 +218,15 @@ class AutoModule(L.LightningModule):
         if schedulers == []:
             if optimizers == []:
                 return None
-            
+
             if len(optimizers) == 1:
                 return optimizers[0]
-            
+
             return optimizers
-        
+
         if optimizers == []:
             raise ValueError("Schedulers were specified but no optimizers were provided")
-      
+
         # See [here](https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.core.LightningModule.html#lightning.pytorch.core.LightningModule.configure_optimizers)
         # for return values allowed by Lightning
         if len(optimizers) == 1 and len(schedulers) == 1:
@@ -221,7 +241,7 @@ class AutoModule(L.LightningModule):
         if self.disable_prog_bar:
             return False
 
-        return phase == 'val'
+        return phase == "val"
 
     def shared_step(self, phase: Phase, *args, **kwargs):
         """A call to shared_step should result in either:
@@ -257,7 +277,11 @@ class AutoModule(L.LightningModule):
             for name, metric in self.metrics.items():
                 metric_func, metric_specific_log_kwargs = _resolve_metric(metric, default_log_kwargs)
 
-                self.log(f"{phase}/{name}", metric_func(*step_out), **metric_specific_log_kwargs)
+                self.log(
+                    f"{phase}/{name}",
+                    metric_func(*step_out),
+                    **metric_specific_log_kwargs,
+                )
         elif isinstance(step_out, dict):
             loss_computed = "loss" in step_out
             criterion_args_provided = "criterion_args" in step_out
@@ -272,7 +296,7 @@ class AutoModule(L.LightningModule):
                 loss = _call_with_flexible_args(self.criterion, step_out["criterion_args"])
 
             curr_step_log_kwargs = default_log_kwargs | step_out.get("log_kwargs", {})
-            metrics_to_log = [] # Store in list to avoid duplicate keys in the log by checking list before logging
+            metrics_to_log = []  # Store in list to avoid duplicate keys in the log by checking list before logging
 
             if "metrics_args" in step_out:
                 for name, args in step_out["metrics_args"].items():
@@ -287,6 +311,7 @@ class AutoModule(L.LightningModule):
 
             # Prioritize computed_metrics over derived metrics
             from collections import Counter
+
             dup_keys = [k for k, c in Counter(k for k, _ in metrics_to_log).items() if c > 1]
 
             for dup in dup_keys:
@@ -301,10 +326,10 @@ class AutoModule(L.LightningModule):
             self.log(f"{phase}/{self.loss_log_key}", loss, **default_log_kwargs)
 
         return loss
-    
+
     def training_step(self, *args: Any, **kwargs: Any):
         return self.shared_logged_step("train", *args, **kwargs)
-    
+
     def validation_step(self, *args: Any, **kwargs: Any):
         return self.shared_logged_step("val", *args, **kwargs)
 

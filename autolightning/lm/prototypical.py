@@ -14,22 +14,31 @@ from autolightning.lm import Classifier
 from autolightning.types import AutoModuleKwargs, Unpack
 
 
-MetaSample = Tuple[Tuple[torch.Tensor, torch.Tensor],
-                                            Tuple[torch.Tensor, torch.Tensor]]
+MetaSample = Tuple[Tuple[torch.Tensor, torch.Tensor], Tuple[torch.Tensor, torch.Tensor]]
 MetaBatch = List[MetaSample]
-MetricType = Literal["euclidean", "euclidean-squared", "logistic-regression", "dot", "dot-sqrt", "manhattan", "cosine"]
+MetricType = Literal[
+    "euclidean",
+    "euclidean-squared",
+    "logistic-regression",
+    "dot",
+    "dot-sqrt",
+    "manhattan",
+    "cosine",
+]
 
 
-UNKNOWN_METRIC_MESSAGE = 'Must be one of [euclidean, euclidean-squared, manhattan, dot, cosine, logistic-regression]'
+UNKNOWN_METRIC_MESSAGE = "Must be one of [euclidean, euclidean-squared, manhattan, dot, cosine, logistic-regression]"
 
 
-def prototypical_forward(embedder: nn.Module,
-                         train_data: torch.Tensor,
-                         test_data: torch.Tensor,
-                         train_labels: torch.Tensor,
-                         metric: str,
-                         average_support_embeddings: bool,
-                         batch_transform: OptionalBatchTransform = None):
+def prototypical_forward(
+    embedder: nn.Module,
+    train_data: torch.Tensor,
+    test_data: torch.Tensor,
+    train_labels: torch.Tensor,
+    metric: str,
+    average_support_embeddings: bool,
+    batch_transform: OptionalBatchTransform = None,
+):
     # It is assumed that the train labels are structured like [0] * k_shot + [1] * k_shot, ...
     # and the evaluation labels are structured like [0] * k_query_shot + [1] * k_query_shot, ...
 
@@ -39,8 +48,8 @@ def prototypical_forward(embedder: nn.Module,
         data = batch_transform(data)
 
     embeddings = embedder(data)
-    support_embeddings = embeddings[:train_data.size(0)]
-    query_embeddings = embeddings[train_data.size(0):]
+    support_embeddings = embeddings[: train_data.size(0)]
+    query_embeddings = embeddings[train_data.size(0) :]
 
     k_shot = len(train_labels) // len(torch.unique(train_labels))
 
@@ -49,39 +58,42 @@ def prototypical_forward(embedder: nn.Module,
         grouped_embeddings = torch.reshape(support_embeddings, (-1, k_shot, support_embeddings.size(1)))
         support_embeddings = torch.mean(grouped_embeddings, dim=1)
 
-        if metric == 'logistic-regression':
-            raise ValueError('Cannot use logistic regression with average support embeddings')
+        if metric == "logistic-regression":
+            raise ValueError("Cannot use logistic regression with average support embeddings")
 
-    if metric.startswith('euclidean'):
+    if metric.startswith("euclidean"):
         similarities = -torch.cdist(query_embeddings, support_embeddings)
 
-        if metric == 'euclidean-squared':
-            similarities = -similarities ** 2
-        elif metric != 'euclidean':
-            raise ValueError(f'Unknown metric: {metric}. {UNKNOWN_METRIC_MESSAGE}')
-    elif metric == 'logistic-regression':
+        if metric == "euclidean-squared":
+            similarities = -(similarities**2)
+        elif metric != "euclidean":
+            raise ValueError(f"Unknown metric: {metric}. {UNKNOWN_METRIC_MESSAGE}")
+    elif metric == "logistic-regression":
         # TODO: set random state
         clf = LogisticRegression(random_state=0).fit(support_embeddings.cpu().numpy(), train_labels.cpu().numpy())
-        similarities = torch.tensor(clf.predict_proba(query_embeddings.cpu().numpy()), device=query_embeddings.device)
-    elif metric.startswith('dot'):
+        similarities = torch.tensor(
+            clf.predict_proba(query_embeddings.cpu().numpy()),
+            device=query_embeddings.device,
+        )
+    elif metric.startswith("dot"):
         similarities = torch.matmul(query_embeddings, support_embeddings.t())
 
-        if metric == 'dot-sqrt':
+        if metric == "dot-sqrt":
             similarities = torch.sqrt(similarities)
-        elif metric != 'dot':
-            raise ValueError(f'Unknown metric: {metric}. {UNKNOWN_METRIC_MESSAGE}')
-    elif metric == 'manhattan':
+        elif metric != "dot":
+            raise ValueError(f"Unknown metric: {metric}. {UNKNOWN_METRIC_MESSAGE}")
+    elif metric == "manhattan":
         similarities = -torch.cdist(query_embeddings, support_embeddings, p=1)
-    elif metric == 'cosine':
+    elif metric == "cosine":
         similarities = F.cosine_similarity(
-                        query_embeddings.unsqueeze(1),  # Shape: (total_queries, 1, embedding_dim)
-                        support_embeddings.unsqueeze(0),  # Shape: (1, support_size, embedding_dim)
-                        dim=2  # Compute cosine similarity along the embedding dimension
-                    )
+            query_embeddings.unsqueeze(1),  # Shape: (total_queries, 1, embedding_dim)
+            support_embeddings.unsqueeze(0),  # Shape: (1, support_size, embedding_dim)
+            dim=2,  # Compute cosine similarity along the embedding dimension
+        )
     else:
-        raise ValueError(f'Unknown metric: {metric}. {UNKNOWN_METRIC_MESSAGE}')
+        raise ValueError(f"Unknown metric: {metric}. {UNKNOWN_METRIC_MESSAGE}")
 
-    if average_support_embeddings or metric == 'logistic-regression':
+    if average_support_embeddings or metric == "logistic-regression":
         shots_per_class = 1
     else:
         shots_per_class = k_shot
@@ -91,9 +103,10 @@ def prototypical_forward(embedder: nn.Module,
     # to the query sample.
     # Evaluation data is shaped like [(class1, shot1, data), (class1, shot2, data), (class2, shot1, data), ...)]
     similarities = torch.reshape(
-        torch.max(torch.reshape(similarities, (-1, shots_per_class)),
-                  dim=1).values, (-1, similarities.shape[1] // shots_per_class))
-    
+        torch.max(torch.reshape(similarities, (-1, shots_per_class)), dim=1).values,
+        (-1, similarities.shape[1] // shots_per_class),
+    )
+
     return similarities
 
 
@@ -115,7 +128,12 @@ def prototypical_shared_step(module, batch):
 
 
 class PrototypicalMixin:
-    def __init__(self, metric: MetricType = "euclidean", average_support_embeddings: bool = True, **kwargs: Unpack[AutoModuleKwargs]):
+    def __init__(
+        self,
+        metric: MetricType = "euclidean",
+        average_support_embeddings: bool = True,
+        **kwargs: Unpack[AutoModuleKwargs],
+    ):
         super().__init__(**kwargs)
 
         self.metric = metric
@@ -124,7 +142,14 @@ class PrototypicalMixin:
 
 class Prototypical(PrototypicalMixin, Classifier):
     def forward(self, train_data, test_data, train_labels):
-        return prototypical_forward(self.net, train_data, test_data, train_labels, self.metric, self.average_support_embeddings)
-    
+        return prototypical_forward(
+            self.net,
+            train_data,
+            test_data,
+            train_labels,
+            self.metric,
+            self.average_support_embeddings,
+        )
+
     def shared_step(self, phase: str, batch, batch_idx):
         return prototypical_shared_step(self, batch)

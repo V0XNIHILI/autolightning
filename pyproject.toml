@@ -36,6 +36,9 @@ build-backend = "hatchling.build"
 # To allow installation of the package from the git repository
 allow-direct-references = true
 
+[tool.ruff]
+line-length = 120
+
 [project.urls]
 "Homepage" = "https://github.com/V0XNIHILI/autolightning"
 "Bug Tracker" = "https://github.com/V0XNIHILI/autolightning/issues"
