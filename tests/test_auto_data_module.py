@@ -134,8 +134,8 @@ def test_dataloaders_per_phase():
         dataset=dict(
             train=ds_train,
             val=ds_val,
-            data_loader=dict(train=dict(batch_size=32), val=dict(batch_size=64)),
-        )
+        ),
+        dataloaders=dict(train=dict(batch_size=32), val=dict(batch_size=64)),
     )
 
     data.prepare_data()
