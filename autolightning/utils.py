@@ -20,7 +20,7 @@ LIGHTNING_STATE_DICT_KEYS = [
     "optimizer_states",
     "lr_schedulers",
     "hparams_name",
-    "hyper_parameters"
+    "hyper_parameters",
 ]
 
 
@@ -39,7 +39,14 @@ def _import_module(module_path: str, default_module: Optional[str] = None) -> An
     return function
 
 
-def load(module: nn.Module, file_path: str, submodule_path: Optional[str], strict: bool = True, assign: bool = False, **kwargs: Any) -> nn.Module:
+def load(
+    module: nn.Module,
+    file_path: str,
+    submodule_path: Optional[str],
+    strict: bool = True,
+    assign: bool = False,
+    **kwargs: Any,
+) -> nn.Module:
     state_dict = torch.load(file_path, **kwargs)
 
     # Check if the state dict is a Lightning state dict
@@ -48,23 +55,27 @@ def load(module: nn.Module, file_path: str, submodule_path: Optional[str], stric
 
     if submodule_path is not None:
         new_state_dict = {}
-        
+
         # Make sure only the sub state dict at the submodule_path is loaded
         for key in state_dict:
             if key.startswith(submodule_path):
-                new_state_dict[key[len(submodule_path) + 1:]] = state_dict[key]
+                new_state_dict[key[len(submodule_path) + 1 :]] = state_dict[key]
 
         state_dict = OrderedDict(new_state_dict)
-    
+
     module.load_state_dict(state_dict, strict=strict, assign=assign)
-    
+
     return module
 
 
-def compile(module: nn.Module, compiler_path: str, compiler_kwargs: Optional[Dict[str, Any]] = None) -> nn.Module:
+def compile(
+    module: nn.Module,
+    compiler_path: str,
+    compiler_kwargs: Optional[Dict[str, Any]] = None,
+) -> nn.Module:
     function = _import_module(compiler_path)
 
-    return function(module, **(compiler_kwargs if compiler_kwargs != None else {}))
+    return function(module, **(compiler_kwargs if compiler_kwargs is not None else {}))
 
 
 def sequential(modules: List[nn.Module]) -> nn.Sequential:
@@ -78,17 +89,21 @@ try:
     def from_transformers_config(
         auto_model: str,
         config: PretrainedConfig,
-        auto_model_kwargs: Optional[Dict[str, Any]] = None
+        auto_model_kwargs: Optional[Dict[str, Any]] = None,
     ) -> _BaseAutoModelClass:
         model_class = _import_module(f"transformers.{auto_model}")
         return model_class.from_config(config, **(auto_model_kwargs or {}))
 
 except ImportError:
-    def from_transformers_config(auto_mode: str, config: Any, auto_model_kwargs: Optional[Dict[str, Any]] = None) -> Any:
+
+    def from_transformers_config(
+        auto_mode: str, config: Any, auto_model_kwargs: Optional[Dict[str, Any]] = None
+    ) -> Any:
         raise ImportError(
             "The 'transformers' library is not installed. "
             "Please install it to use the 'from_transformers_config' function."
         )
+
 
 def disable_grad(module: nn.Module) -> nn.Module:
     for param in module.parameters():
@@ -149,8 +164,8 @@ def merge_dicts(dict1: dict, dict2: dict):
     """Code taken from: https://stackoverflow.com/a/58742155/11251769."""
 
     for key, val in dict1.items():
-        if type(val) == dict:
-            if key in dict2 and type(dict2[key] == dict):
+        if isinstance(val, dict):
+            if key in dict2 and isinstance(dict2[key], dict):
                 merge_dicts(dict1[key], dict2[key])
         else:
             if key in dict2:

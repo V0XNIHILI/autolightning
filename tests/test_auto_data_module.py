@@ -13,7 +13,7 @@ VAL_KWARGS = {"batch_size": 64, "num_workers": 8}
 def test_dataloader_kwargs_basic():
     kwargs = {"batch_size": 32, "num_workers": 4}
 
-    data =  AutoDataModule(dataloaders=kwargs)
+    data = AutoDataModule(dataloaders=kwargs)
 
     for phase in PHASES:
         assert data.get_dataloader_kwargs(phase) == kwargs
@@ -29,7 +29,7 @@ def test_per_phase_dataloader_kwargs():
     assert data.get_dataloader_kwargs("test") == data.get_dataloader_kwargs("pred") == {}
 
 
-def test_per_phase_dataloader_kwargs():
+def test_per_phase_dataloader_kwargs_including_defaults():
     default_kwargs = {"batch_size": 16, "num_workers": 2}
 
     kwargs = {"train": TRAIN_KWARGS, "val": VAL_KWARGS, "defaults": default_kwargs}
@@ -58,14 +58,14 @@ def test_post_init_dataset():
             args=dict(
                 defaults=dict(root="data", download=True),
                 train=dict(train=True),
-                val=dict(train=False)
-            )
+                val=dict(train=False),
+            ),
         )
     )
 
     data.prepare_data()
 
-    data.setup('fit')
+    data.setup("fit")
 
     train_ds = data.get_dataset("train")
     val_ds = data.get_dataset("val")
@@ -73,8 +73,8 @@ def test_post_init_dataset():
     assert len(train_ds) == 50000
     assert len(val_ds) == 10000
 
-    assert train_ds.train == True
-    assert val_ds.train == False
+    assert train_ds.train
+    assert not val_ds.train
 
     train_ds_manually = CIFAR10("data", train=True, download=True)
     val_ds_manually = CIFAR10("data", train=False, download=True)
@@ -89,13 +89,11 @@ def test_post_init_dataset():
 def test_regular_dataset():
     ds = CIFAR10("data", train=True, download=True)
 
-    data = AutoDataModule(
-        dataset=ds
-    )
+    data = AutoDataModule(dataset=ds)
 
     data.prepare_data()
 
-    data.setup('fit')
+    data.setup("fit")
 
     ds_from_data = data.get_dataset("train")
 
@@ -112,16 +110,11 @@ def test_datasets_per_phase():
     ds_train = CIFAR10("data", train=True, download=True)
     ds_val = CIFAR10("data", train=False, download=True)
 
-    data = AutoDataModule(
-        dataset=dict(
-            train=ds_train,
-            val=ds_val
-        )
-    )
+    data = AutoDataModule(dataset=dict(train=ds_train, val=ds_val))
 
     data.prepare_data()
 
-    data.setup('fit')
+    data.setup("fit")
 
     ds_from_data_train = data.get_dataset("train")
     ds_from_data_val = data.get_dataset("val")
@@ -141,16 +134,13 @@ def test_dataloaders_per_phase():
         dataset=dict(
             train=ds_train,
             val=ds_val,
-            data_loader=dict(
-                train=dict(batch_size=32),
-                val=dict(batch_size=64)
-            )
+            data_loader=dict(train=dict(batch_size=32), val=dict(batch_size=64)),
         )
     )
 
     data.prepare_data()
 
-    data.setup('fit')
+    data.setup("fit")
 
     train_dl = data.train_dataloader()
     val_dl = data.val_dataloader()
@@ -176,13 +166,13 @@ def test_post_init_dataset_per_phase():
                 class_name="torchvision.datasets.CIFAR10",
                 args=dict(root="data", download=True, train=False),
             ),
-            test=CIFAR10("data", train=False, download=True)
+            test=CIFAR10("data", train=False, download=True),
         )
     )
 
     data.prepare_data()
 
-    data.setup('fit')
+    data.setup("fit")
 
     train_ds = data.get_dataset("train")
     val_ds = data.get_dataset("val")
@@ -190,8 +180,8 @@ def test_post_init_dataset_per_phase():
     assert len(train_ds) == 50000
     assert len(val_ds) == 10000
 
-    assert train_ds.train == True
-    assert val_ds.train == False
+    assert train_ds.train
+    assert not val_ds.train
 
     train_ds_manually = CIFAR10("data", train=True, download=True)
     val_ds_manually = CIFAR10("data", train=False, download=True)
@@ -202,12 +192,12 @@ def test_post_init_dataset_per_phase():
     for i in range(len(val_ds)):
         assert val_ds[i] == val_ds_manually[i]
 
-    data.setup('test')
+    data.setup("test")
 
     test_ds = data.get_dataset("test")
 
     assert len(test_ds) == 10000
-    assert test_ds.train == False
+    assert not test_ds.train
 
     for i in range(len(test_ds)):
         assert test_ds[i] == val_ds_manually[i]

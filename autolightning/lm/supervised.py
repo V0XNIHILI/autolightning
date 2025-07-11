@@ -17,6 +17,6 @@ def supervised_shared_step(phase: Phase, module: NetType, inputs: Any, targets: 
 class Supervised(AutoModule):
     def forward(self, *args, **kwargs):
         return supervised_forward(self.net, *args, **kwargs)
-    
+
     def shared_step(self, phase: Phase, batch, batch_idx):
         return supervised_shared_step(phase, self, batch[0], batch[1])

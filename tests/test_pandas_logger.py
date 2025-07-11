@@ -2,7 +2,8 @@ import pandas as pd
 import pytest
 from unittest.mock import patch
 
-from autolightning.loggers import PandasLogger 
+from autolightning.loggers import PandasLogger
+
 
 @pytest.fixture
 def logger():
@@ -32,10 +33,7 @@ def test_log_metrics(logger):
     logger.log_metrics(metrics1, step1)
     logger.log_metrics(metrics2, step2)
 
-    expected_df = pd.DataFrame([
-        {**metrics1, "step": step1},
-        {**metrics2, "step": step2}
-    ])
+    expected_df = pd.DataFrame([{**metrics1, "step": step1}, {**metrics2, "step": step2}])
     pd.testing.assert_frame_equal(logger.get_logs(), expected_df)
 
 
@@ -44,13 +42,13 @@ def test_log_metrics_empty(logger):
 
 
 def test_save(logger):
-    with patch.object(logger, 'save', return_value=None) as mock_save:
+    with patch.object(logger, "save", return_value=None) as mock_save:
         logger.save()
         mock_save.assert_called_once()
 
 
 def test_finalize(logger):
     status = "COMPLETED"
-    with patch.object(logger, 'finalize', return_value=None) as mock_finalize:
+    with patch.object(logger, "finalize", return_value=None) as mock_finalize:
         logger.finalize(status)
         mock_finalize.assert_called_once_with(status)

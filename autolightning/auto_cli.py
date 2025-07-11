@@ -9,7 +9,11 @@ from jsonargparse import ActionConfigFile
 
 import lightning as L
 import pytorch_lightning as pl
-from lightning.pytorch.cli import LightningCLI, LightningArgumentParser, SaveConfigCallback
+from lightning.pytorch.cli import (
+    LightningCLI,
+    LightningArgumentParser,
+    SaveConfigCallback,
+)
 from lightning.pytorch.loggers import Logger
 from lightning.pytorch.trainer import Trainer
 
@@ -43,12 +47,12 @@ def cc(class_path: str, init_args: Optional[dict] = None, **kwargs: Any):
 
 def write_to_temp_file(content):
     # Create a temporary file
-    temp_file = tempfile.NamedTemporaryFile(delete=False, mode='w', encoding='utf-8', suffix='.yaml')
-    
+    temp_file = tempfile.NamedTemporaryFile(delete=False, mode="w", encoding="utf-8", suffix=".yaml")
+
     try:
         # Write content to the temporary file
         temp_file.write(content)
-        
+
         # Return the path of the temporary file
         return temp_file.name
     finally:
@@ -64,7 +68,7 @@ def replace_tuples_with_lists(obj: Union[Dict, List, Tuple, Any]):
         return [replace_tuples_with_lists(elem) for elem in obj]
     elif isinstance(obj, tuple):
         return list(obj)
-    
+
     return obj
 
 
@@ -80,11 +84,11 @@ class LoggerSaveConfigCallback(SaveConfigCallback):
         model_config = config.get("model", None)
 
         # Only save the model config to the pl_module as hyperparameters
-        if model_config != None:
+        if model_config is not None:
             if "class_path" in model_config:
                 model_config = model_config.get("init_args", None)
 
-            if model_config != None:
+            if model_config is not None:
                 pl_module.save_hyperparameters(model_config, logger=False)
 
 
@@ -156,41 +160,121 @@ class AutoCLI(LightningCLI):
         kwargs.setdefault("dump_header", [f"lightning.pytorch=={pl.__version__}"])
 
         parser = LightningArgumentParser(**kwargs)
-        parser.add_argument("-c", "--config", action=ActionConfigFilePython, help="Path to a configuration file in JSON, YAML or Python format.")
+        parser.add_argument(
+            "-c",
+            "--config",
+            action=ActionConfigFilePython,
+            help="Path to a configuration file in JSON, YAML or Python format.",
+        )
 
         return parser
-    
+
     def add_arguments_to_parser(self, parser: LightningArgumentParser) -> None:
         # Add arguments for disable_torch_debug_apis
-        parser.add_argument("--torch.autograd.set_detect_anomaly", type=bool, default=False, help="Whether to detect anomalies.")
-        parser.add_argument("--torch.autograd.profiler.profile", type=bool, default=True, help="Whether to profile.")
-        parser.add_argument("--torch.autograd.profiler.emit_nvtx", type=bool, default=True, help="Whether to emit nvtx.")
+        parser.add_argument(
+            "--torch.autograd.set_detect_anomaly",
+            type=bool,
+            default=False,
+            help="Whether to detect anomalies.",
+        )
+        parser.add_argument(
+            "--torch.autograd.profiler.profile",
+            type=bool,
+            default=True,
+            help="Whether to profile.",
+        )
+        parser.add_argument(
+            "--torch.autograd.profiler.emit_nvtx",
+            type=bool,
+            default=True,
+            help="Whether to emit nvtx.",
+        )
 
         # Add arguments for configure_cuda
-        parser.add_argument("--torch.set_float32_matmul_precision", type=Literal["highest", "high", "medium"], default='highest', help="Precision of float32 matmul (highest, high, medium).")
-        parser.add_argument("--torch.backends.cuda.matmul.allow_tf32", type=bool, default=False, help="Allow TF32 matmul.")
-        parser.add_argument("--torch.backends.cudnn.allow_tf32", type=bool, default=True, help="Allow TF32 cuDNN operations.")
-        parser.add_argument("--torch.backends.cudnn.benchmark", type=bool, default=False, help="Use cuDNN benchmark mode.")
+        parser.add_argument(
+            "--torch.set_float32_matmul_precision",
+            type=Literal["highest", "high", "medium"],
+            default="highest",
+            help="Precision of float32 matmul (highest, high, medium).",
+        )
+        parser.add_argument(
+            "--torch.backends.cuda.matmul.allow_tf32",
+            type=bool,
+            default=False,
+            help="Allow TF32 matmul.",
+        )
+        parser.add_argument(
+            "--torch.backends.cudnn.allow_tf32",
+            type=bool,
+            default=True,
+            help="Allow TF32 cuDNN operations.",
+        )
+        parser.add_argument(
+            "--torch.backends.cudnn.benchmark",
+            type=bool,
+            default=False,
+            help="Use cuDNN benchmark mode.",
+        )
 
         # Add other arguments
         # torch.set_num_threads
-        parser.add_argument("--torch.set_num_threads", type=int, default=-1, help="Sets the number of threads used for intraop parallelism on CPU.")
+        parser.add_argument(
+            "--torch.set_num_threads",
+            type=int,
+            default=-1,
+            help="Sets the number of threads used for intraop parallelism on CPU.",
+        )
 
         # Add arguments for wandb.watch
-        parser.add_argument("--wandb.watch.enable", type=bool, default=False, help="Whether to enable wandb.watch.")
-        parser.add_argument("--wandb.watch.models", type=Optional[Union[str, List[str]]], default="net", help="A single model or a sequence of models to be monitored.")
-        parser.add_argument("--wandb.watch.criterion", type=Optional[str], default="criterion", help="The loss function being optimized (optional).")
-        parser.add_argument("--wandb.watch.log", type=Optional[Literal['gradients', 'parameters', 'all']], default="gradients", help="Specifies whether to log gradients, parameters, or all. Set to None to disable logging.")
-        parser.add_argument("--wandb.watch.log_freq", type=int, default=1000, help="How frequently to log gradients and parameters, expressed in batches.")
-        parser.add_argument("--wandb.watch.idx", type=int, default=None, help="Index used when tracking multiple models with wandb.watch.")
-        parser.add_argument("--wandb.watch.log_graph", type=bool, default=False, help="Whether to log the model's computational graph.")
+        parser.add_argument(
+            "--wandb.watch.enable",
+            type=bool,
+            default=False,
+            help="Whether to enable wandb.watch.",
+        )
+        parser.add_argument(
+            "--wandb.watch.models",
+            type=Optional[Union[str, List[str]]],
+            default="net",
+            help="A single model or a sequence of models to be monitored.",
+        )
+        parser.add_argument(
+            "--wandb.watch.criterion",
+            type=Optional[str],
+            default="criterion",
+            help="The loss function being optimized (optional).",
+        )
+        parser.add_argument(
+            "--wandb.watch.log",
+            type=Optional[Literal["gradients", "parameters", "all"]],
+            default="gradients",
+            help="Specifies whether to log gradients, parameters, or all. Set to None to disable logging.",
+        )
+        parser.add_argument(
+            "--wandb.watch.log_freq",
+            type=int,
+            default=1000,
+            help="How frequently to log gradients and parameters, expressed in batches.",
+        )
+        parser.add_argument(
+            "--wandb.watch.idx",
+            type=int,
+            default=None,
+            help="Index used when tracking multiple models with wandb.watch.",
+        )
+        parser.add_argument(
+            "--wandb.watch.log_graph",
+            type=bool,
+            default=False,
+            help="Whether to log the model's computational graph.",
+        )
 
     def _get_wandb_watch_models(self):
         wandb_watch_models = self.config["fit"]["wandb"]["watch"]["models"]
 
         if wandb_watch_models is not None:
             if isinstance(wandb_watch_models, str):
-                models = getattr(self.model,wandb_watch_models)
+                models = getattr(self.model, wandb_watch_models)
             else:
                 models = [getattr(self.model, model_name) for model_name in wandb_watch_models]
         else:
@@ -218,7 +302,7 @@ class AutoCLI(LightningCLI):
                 log=wandb_watch_cfg["log"],
                 log_freq=wandb_watch_cfg["log_freq"],
                 idx=wandb_watch_cfg["idx"],
-                log_graph=wandb_watch_cfg["log_graph"]
+                log_graph=wandb_watch_cfg["log_graph"],
             )
 
     def after_fit(self):
@@ -229,7 +313,7 @@ class AutoCLI(LightningCLI):
         if wandb_watch_cfg["enable"]:
             models = self._get_wandb_watch_models()
             self.trainer.logger.experiment.unwatch(models)
-    
+
     def before_instantiate_classes(self):
         if self.subcommand is None:
             cfg = self.config
@@ -245,7 +329,7 @@ class AutoCLI(LightningCLI):
         disable_torch_debug_apis(
             torch_autograd_cfg["set_detect_anomaly"],
             torch_autograd_cfg["profiler"]["profile"],
-            torch_autograd_cfg["profiler"]["emit_nvtx"]
+            torch_autograd_cfg["profiler"]["emit_nvtx"],
         )
 
         # Configure CUDA
@@ -253,7 +337,7 @@ class AutoCLI(LightningCLI):
             torch_cfg["set_float32_matmul_precision"],
             torch_backends_cfg["cuda"]["matmul"]["allow_tf32"],
             torch_backends_cudnn_cfg["allow_tf32"],
-            torch_backends_cudnn_cfg["benchmark"]
+            torch_backends_cudnn_cfg["benchmark"],
         )
 
         if torch_cfg["set_num_threads"] != -1:

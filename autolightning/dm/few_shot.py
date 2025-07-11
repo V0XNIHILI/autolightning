@@ -8,7 +8,12 @@ from .. import AutoDataModule
 from ..types import Unpack, AutoDataModuleKwargs
 
 
-def before_after_batch_transfer_flatten(on_before_after_method, batch, dataloader_idx: int, flatten_for_batch_transform: bool):
+def before_after_batch_transfer_flatten(
+    on_before_after_method,
+    batch,
+    dataloader_idx: int,
+    flatten_for_batch_transform: bool,
+):
     if flatten_for_batch_transform:
         ((X_support, y_support), (X_query, y_query)) = batch
 
@@ -39,20 +44,22 @@ def before_after_batch_transfer_flatten(on_before_after_method, batch, dataloade
 
 
 class FewShotMixin:
-    def __init__(self,
-                 ways: int = 5,
-                 shots: int = 1,
-                 train_ways: int = -1,
-                 query_shots: int = -1,
-                 query_ways: int = -1,
-                 train_query_shots: int = -1,
-                 keep_original_labels: bool = False,
-                 shuffle_labels: bool = False,
-                 samples_per_class: Optional[Dict[str, int]] = None,
-                 flatten_for_batch_transform: Union[bool, Dict[str, bool]] = False,
-                 **kwargs: Unpack[AutoDataModuleKwargs]):
+    def __init__(
+        self,
+        ways: int = 5,
+        shots: int = 1,
+        train_ways: int = -1,
+        query_shots: int = -1,
+        query_ways: int = -1,
+        train_query_shots: int = -1,
+        keep_original_labels: bool = False,
+        shuffle_labels: bool = False,
+        samples_per_class: Optional[Dict[str, int]] = None,
+        flatten_for_batch_transform: Union[bool, Dict[str, bool]] = False,
+        **kwargs: Unpack[AutoDataModuleKwargs],
+    ):
         super().__init__(**kwargs)
-        
+
         self.ways = ways
         self.shots = shots
         self.train_ways = train_ways
@@ -70,7 +77,7 @@ class FewShotMixin:
         ways = self.ways
         query_shots = self.query_shots
 
-        if phase == 'train':
+        if phase == "train":
             if self.train_ways != -1:
                 ways = self.train_ways
 
@@ -85,15 +92,23 @@ class FewShotMixin:
             query_ways=self.query_ways,
             keep_original_labels=self.keep_original_labels,
             shuffle_labels=self.shuffle_labels,
-            samples_per_class=self.samples_per_class[phase] if self.samples_per_class else None
+            samples_per_class=self.samples_per_class[phase] if self.samples_per_class else None,
         )
-    
+
     def on_before_batch_transfer(self, batch, dataloader_idx: int):
-        flatten = self.flatten_for_batch_transform if isinstance(self.flatten_for_batch_transform, bool) else self.flatten_for_batch_transform.get('before', False)
+        flatten = (
+            self.flatten_for_batch_transform
+            if isinstance(self.flatten_for_batch_transform, bool)
+            else self.flatten_for_batch_transform.get("before", False)
+        )
         return before_after_batch_transfer_flatten(super().on_before_batch_transfer, batch, dataloader_idx, flatten)
-    
+
     def on_after_batch_transfer(self, batch, dataloader_idx: int):
-        flatten = self.flatten_for_batch_transform if isinstance(self.flatten_for_batch_transform, bool) else self.flatten_for_batch_transform.get('after', False)
+        flatten = (
+            self.flatten_for_batch_transform
+            if isinstance(self.flatten_for_batch_transform, bool)
+            else self.flatten_for_batch_transform.get("after", False)
+        )
         return before_after_batch_transfer_flatten(super().on_after_batch_transfer, batch, dataloader_idx, flatten)
 
 
