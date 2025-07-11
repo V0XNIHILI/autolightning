@@ -29,7 +29,7 @@ def test_per_phase_dataloader_kwargs():
     assert data.get_dataloader_kwargs("test") == data.get_dataloader_kwargs("pred") == {}
 
 
-def test_per_phase_dataloader_kwargs():
+def test_per_phase_dataloader_kwargs_including_defaults():
     default_kwargs = {"batch_size": 16, "num_workers": 2}
 
     kwargs = {"train": TRAIN_KWARGS, "val": VAL_KWARGS, "defaults": default_kwargs}
@@ -73,8 +73,8 @@ def test_post_init_dataset():
     assert len(train_ds) == 50000
     assert len(val_ds) == 10000
 
-    assert train_ds.train == True
-    assert val_ds.train == False
+    assert train_ds.train
+    assert not val_ds.train
 
     train_ds_manually = CIFAR10("data", train=True, download=True)
     val_ds_manually = CIFAR10("data", train=False, download=True)
@@ -190,8 +190,8 @@ def test_post_init_dataset_per_phase():
     assert len(train_ds) == 50000
     assert len(val_ds) == 10000
 
-    assert train_ds.train == True
-    assert val_ds.train == False
+    assert train_ds.train
+    assert not val_ds.train
 
     train_ds_manually = CIFAR10("data", train=True, download=True)
     val_ds_manually = CIFAR10("data", train=False, download=True)
@@ -207,7 +207,7 @@ def test_post_init_dataset_per_phase():
     test_ds = data.get_dataset("test")
 
     assert len(test_ds) == 10000
-    assert test_ds.train == False
+    assert not test_ds.train
 
     for i in range(len(test_ds)):
         assert test_ds[i] == val_ds_manually[i]

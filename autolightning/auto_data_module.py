@@ -136,7 +136,9 @@ def iteratively_apply_transform(batch, transforms):
 
 def apply_batch_transforms(batch, key: str, transforms: dict, target_batch_transforms: Union[dict, str]):
     tf = transforms.get(key, None)
-    id = lambda x: x
+    
+    def id(x):
+        return x
 
     if tf is not None:
         if target_batch_transforms == "combine":
@@ -357,7 +359,7 @@ class AutoDataModule(L.LightningDataModule):
     def get_transformed_dataset(self, phase: Phase):
         dataset = self.get_dataset(phase)
 
-        if self.pre_load == True or (isinstance(self.pre_load, dict) and self.pre_load.get(phase, False)):
+        if self.pre_load or (isinstance(self.pre_load, dict) and self.pre_load.get(phase, False)):
             pre_load_tf = None
             pre_load_target_tf = None
     

@@ -110,7 +110,7 @@ def test_parameters_for_optimizer(dummy_net):
     assert list(module.parameters_for_optimizer()) == []
 
     module = AutoModule(net=dummy_net, exclude_no_grad=False)
-    assert module.exclude_no_grad == False
+    assert not module.exclude_no_grad
     assert list(module.parameters_for_optimizer()) == list(dummy_net.parameters())
 
 
@@ -205,7 +205,9 @@ def test_optimizer_with_scheduler_dict_callable(dummy_net, dummy_criterion):
 
 def test_callable_optimizer_with_scheduler_dict_callable(dummy_net, dummy_criterion):
     """Tests using a callable optimizer with a scheduler dictionary containing a callable and additional parameters."""
-    optimizer = lambda params: optim.SGD(params, lr=0.1)
+    def optimizer(params):
+        return optim.SGD(params, lr=0.1)
+
     scheduler = {
         "scheduler": lambda opt: optim.lr_scheduler.StepLR(opt, step_size=10, gamma=0.1),
         "monitor": "val/loss",

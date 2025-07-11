@@ -10,10 +10,10 @@ def auto_main(config: Optional[Union[List[dict], dict]] = None, subcommand: Opti
     main_config = {}
 
     if config is not None:
-        if run == False:
-            assert subcommand is None, "subcommand must be None if run is False and config is not None."
-        else:
+        if run:
             assert subcommand is not None, "subcommand must be provided if run is True and config is not None."
+        else:
+            assert subcommand is None, "subcommand must be None if run is False and config is not None."
 
         if isinstance(config, list):
             for subconfig in config:
@@ -30,7 +30,7 @@ def auto_main(config: Optional[Union[List[dict], dict]] = None, subcommand: Opti
             final_config = main_config
     else:
         assert subcommand is None, "subcommand must be None if config is None."
-        assert run == True, "run must be True if config is None."
+        assert run, "run must be True if config is None."
 
     cli = AutoCLI(
         AutoModule,
