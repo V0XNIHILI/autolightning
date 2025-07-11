@@ -494,6 +494,8 @@ analysis = tune.run(tune_function, config=search_space)
 
 ### Config-file utilities
 
+Since `jsonargparse` does not support various constructs that are often used for deep learning experiments, `autolightning` includes special type-checked utility functions for these operations.
+
 #### Loading Pre-trained Models
 
 ```yaml
@@ -514,9 +516,7 @@ model:
 #### Compiling Models
 
 ```yaml
-model:
-  class_path: autolightning.lm.Classifier
-  init_args:
+...
     net:
       class_path: autolightning.compile
       init_args:
@@ -531,9 +531,7 @@ model:
 #### Freezing Model Parameters
 
 ```yaml
-model:
-  class_path: autolightning.lm.Classifier
-  init_args:
+...
     net:
       class_path: autolightning.disable_grad
       init_args:
@@ -542,6 +540,43 @@ model:
           init_args:
               in_channels: 784
               hidden_channels: [100, 10]
+```
+
+#### `torch.nn.Sequential`:
+
+```yaml
+...
+    net:
+      class_path: autolightning.sequential
+      init_args:
+        modules:
+          - class_path: nn.Linear
+            init_args:
+                in_features: 784
+                out_features: 100
+          - class_path: nn.Linear
+            init_args:
+                in_features: 100
+                out_features: 10
+```
+
+#### Huggingface's `AutoModule.from_config`:
+
+```yaml
+...
+    net:
+      class_path: autolightning.from_transformers_config
+      init_args:
+        auto_model: AutoModelForCausalLM
+        config:
+          class_path: fla.models.GLAConfig
+          init_args:
+            hidden_size: 256
+            num_hidden_Layers: 4
+            num_heads: 2
+            expand_v: 1
+            max_position_embeddings: 1024
+            vocab_size: 32
 ```
 
 ## Best Practices
@@ -631,9 +666,9 @@ from autolightning.main import auto_main
 with open("config.yaml", "r") as f:
     config = yaml.safe_load(f)
 
+# Run the 'fit' procedure
 auto_main(
-  # Load config from one or more files
-  config=config, # Can be a list of dictionaries
+  config=config, # Can also be a list of dictionaries
   subcommand="fit"
 )
 
@@ -648,9 +683,10 @@ from autolightning.main import auto_main
 with open("config.yaml", "r") as f:
     config = yaml.safe_load(f)
 
-# Load config from one or more files
+# Instantiate the trainer, model and data module
+# but do not start training or testing
 trainer, model, datamodule = auto_main(
-    config=config,
+    config=config, # Can also be a list of dictionaries
     run=False 
 )
 ```
