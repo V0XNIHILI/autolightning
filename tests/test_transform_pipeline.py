@@ -519,7 +519,7 @@ def test_phase_specific_pre_load():
     transforms_dict = {
         "pre_load": SimpleTransform(1),
         "train": SimpleTransform(2),
-        "val": SimpleTransform(3)
+        "val": SimpleTransform(8)
     }
     
     # Enable pre_load only for train phase
@@ -536,8 +536,25 @@ def test_phase_specific_pre_load():
     data.setup('fit')
     
     # Get train dataset - should work fine with pre_load
-    _ = data.get_transformed_dataset("train")
+    train_ds = data.get_transformed_dataset("train")
     
-    # Get val dataset - should raise error
-    with pytest.raises(ValueError, match="Pre-load transform specified.*but pre-load is not enabled"):
-        _ = data.get_transformed_dataset("val")
+    # Get val dataset - should work fine too but without pre_load
+    val_ds = data.get_transformed_dataset("val")
+
+    # Original dataset items
+    train_original = CIFAR10("data", train=True, download=True)
+    val_original = CIFAR10("data", train=False, download=True)
+
+    # Test train dataset
+    img, _ = train_original[0]
+    transformed_img, _ = train_ds[0]
+    
+    # Image: pre_load(+1) + train(+2) = +6
+    assert torch.allclose(transformed_img, transforms.ToTensor()(img) + 3)
+    
+    # Test val dataset
+    img, _ = val_original[0]
+    transformed_img, _ = val_ds[0]
+
+    # Image: val(+8) = +8
+    assert torch.allclose(transformed_img, transforms.ToTensor()(img) + 8)

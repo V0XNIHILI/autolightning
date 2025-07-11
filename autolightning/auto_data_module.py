@@ -414,7 +414,7 @@ class AutoDataModule(L.LightningDataModule):
     def get_transformed_dataset(self, phase: Phase):
         dataset = self.get_dataset(phase)
 
-        if self.pre_load or (isinstance(self.pre_load, dict) and self.pre_load.get(phase, False)):
+        if (isinstance(self.pre_load, bool) and self.pre_load) or (isinstance(self.pre_load, dict) and self.pre_load.get(phase, False)):
             pre_load_tf = None
             pre_load_target_tf = None
 
@@ -426,7 +426,8 @@ class AutoDataModule(L.LightningDataModule):
                 dataset = Transformed(dataset, pre_load_tf, pre_load_target_tf)
 
             dataset = PreLoaded(dataset)
-        elif isinstance(self.transforms, dict):
+        elif isinstance(self.transforms, dict) and isinstance(self.pre_load, dict) and not any(self.pre_load):
+            # Check if a pre-load transform is specified but not used at all in any of the phases
             if self.transforms.get(PRE_LOAD_MOMENT, None) is not None:
                 raise ValueError(f"Pre-load transform specified for phase {phase} but pre-load is not enabled")
             elif self.target_transforms.get(PRE_LOAD_MOMENT, None) is not None:

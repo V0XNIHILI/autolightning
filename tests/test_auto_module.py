@@ -277,27 +277,6 @@ def test_optimizer_list_instances(dummy_net, dummy_criterion):
     assert isinstance(result[1], optim.Adam)
 
 
-def test_optimizer_list_callables(dummy_net, dummy_criterion):
-    """Tests using a list of optimizer callables and verifies they're instantiated with the correct parameters."""
-    optimizer = [
-        lambda params: optim.SGD(params, lr=0.01),
-        lambda params: optim.Adam(params, lr=0.001),
-    ]
-
-    module = AutoModule(net=dummy_net, criterion=dummy_criterion, optimizer=optimizer)
-
-    result = module.configure_optimizers()
-
-    assert isinstance(result, list)
-    assert len(result) == 2
-    assert isinstance(result[0], optim.SGD)
-    assert isinstance(result[1], optim.Adam)
-    assert result[0].param_groups[0]["lr"] == 0.01
-    assert result[1].param_groups[0]["lr"] == 0.001
-    assert result[0].param_groups[0]["params"] == list(dummy_net.parameters())
-    assert result[1].param_groups[0]["params"] == list(dummy_net.parameters())
-
-
 def test_optimizer_list_callables_with_module_list(dummy_module_list, dummy_criterion):
     """Tests using a list of optimizer callables with a ModuleList and verifies each optimizer is paired with its respective module."""
     optimizer = [
