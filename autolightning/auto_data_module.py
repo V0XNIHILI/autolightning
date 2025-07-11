@@ -370,9 +370,9 @@ class AutoDataModule(L.LightningDataModule):
 
             dataset = PreLoaded(dataset)
         elif isinstance(self.transforms, dict):
-            if self.transforms.get(PRE_LOAD_MOMENT, None) != None:
+            if self.transforms.get(PRE_LOAD_MOMENT, None) is not None:
                 raise ValueError(f"Pre-load transform specified for phase {phase} but pre-load is not enabled")
-            elif self.target_transforms.get(PRE_LOAD_MOMENT, None) != None:
+            elif self.target_transforms.get(PRE_LOAD_MOMENT, None) is not None:
                 raise ValueError(f"Pre-load target transform specified for phase {phase} but pre-load is not enabled")
 
         transform = self.get_transform(phase)

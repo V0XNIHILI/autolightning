@@ -19,7 +19,7 @@ class LogKeyMixin:
         self.prefix = prefix
         self.postfix = postfix
 
-        if phase_mapping != None:
+        if phase_mapping is not None:
             full_phase_mapping = {phase: phase for phase in LOG_PHASE_KEYS}
             full_phase_mapping.update(phase_mapping.copy())
 

@@ -88,9 +88,9 @@ class BrevitasMixin:
         self.prepare_model()
 
     def prepare_model(self):
-        assert self.net != None, "Default model to quantize ('self.net') is not set."
+        assert self.net is not None, "Default model to quantize ('self.net') is not set."
 
-        if self.skip_modules != None:
+        if self.skip_modules is not None:
             skip_modules = [_import_module(module) if isinstance(module, str) else module for module in self.skip_modules]
         else:
             skip_modules = None
@@ -132,7 +132,7 @@ class BrevitasMixin:
     def on_train_batch_start(self, batch: Any, batch_idx: int) -> Optional[int]:
         out = super().on_train_batch_start(batch, batch_idx)
 
-        if self.current_context is None and self.limit_calibration_batches != None:
+        if self.current_context is None and self.limit_calibration_batches is not None:
             context_name = _get_first_context(self.contexts_to_enter, self.contexts_exited)
 
             if context_name is not None:

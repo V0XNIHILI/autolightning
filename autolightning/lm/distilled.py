@@ -11,7 +11,7 @@ from ..utils import disable_grad
 def distilled_forward(student: nn.Module, student_head : Optional[nn.Module] = None, student_regressor : Optional[nn.Module]= None, *args, **kwargs):
     outputs = student(*args, **kwargs)
 
-    if student_head != None:
+    if student_head is not None:
         if student_regressor:
             features = student_regressor(outputs)
         else:
@@ -38,7 +38,7 @@ class DistilledMixin:
     def __init__(self, student_net: nn.Module, teacher_net: nn.Module, student_head_net: Optional[nn.Module] = None, student_regressor_net: Optional[nn.Module] = None, **kwargs: Unpack[AutoModuleKwargsNoNet]):
         super().__init__(net=None, **kwargs)
 
-        if student_head_net == None and student_regressor_net != None:
+        if student_head_net == None and student_regressor_net is not None:
             raise ValueError("Cannot use student_regressor without student_head")
 
         self.student_net = student_net

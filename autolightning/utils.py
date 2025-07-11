@@ -64,7 +64,7 @@ def load(module: nn.Module, file_path: str, submodule_path: Optional[str], stric
 def compile(module: nn.Module, compiler_path: str, compiler_kwargs: Optional[Dict[str, Any]] = None) -> nn.Module:
     function = _import_module(compiler_path)
 
-    return function(module, **(compiler_kwargs if compiler_kwargs != None else {}))
+    return function(module, **(compiler_kwargs if compiler_kwargs is not None else {}))
 
 
 def sequential(modules: List[nn.Module]) -> nn.Sequential:

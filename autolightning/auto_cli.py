@@ -80,11 +80,11 @@ class LoggerSaveConfigCallback(SaveConfigCallback):
         model_config = config.get("model", None)
 
         # Only save the model config to the pl_module as hyperparameters
-        if model_config != None:
+        if model_config is not None:
             if "class_path" in model_config:
                 model_config = model_config.get("init_args", None)
 
-            if model_config != None:
+            if model_config is not None:
                 pl_module.save_hyperparameters(model_config, logger=False)
 
 

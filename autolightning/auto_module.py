@@ -102,12 +102,12 @@ class AutoModule(L.LightningModule):
             yield from params
 
     def register_optimizer(self, module: nn.Module, optimizer: Optional[OptimizerCallable] = None, lr_scheduler: Optional[LrSchedulerType] = None):
-        if optimizer != None:
+        if optimizer is not None:
             if module in self.optimizers_schedulers:
                 warnings.warn(f"Optimizer for module '{module}' already exists in optimizers_schedulers. Overwriting it.")
 
             self.optimizers_schedulers[module] = (optimizer, lr_scheduler)
-        elif lr_scheduler != None:
+        elif lr_scheduler is not None:
             raise ValueError("Cannot register a scheduler when the optimizer is None")
 
     def configure_optimizers(self) -> OptimizerLRScheduler:
@@ -129,7 +129,7 @@ class AutoModule(L.LightningModule):
             if isinstance(optimizer, optim.Optimizer):
                 optimizers.append(optimizer)
 
-                if scheduler != None:
+                if scheduler is not None:
                     if isinstance(scheduler, optim.lr_scheduler.LRScheduler):
                         schedulers.append(scheduler)
                     elif callable(scheduler):
@@ -152,7 +152,7 @@ class AutoModule(L.LightningModule):
                 params = self.parameters_for_optimizer() if module == self else module.parameters()
                 optimizers.append(optimizer(params))
 
-                if scheduler != None:
+                if scheduler is not None:
                     if callable(scheduler):
                         schedulers.append(scheduler(optimizers[-1]))
                     elif isinstance(scheduler, dict):
