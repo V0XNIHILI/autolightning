@@ -2,24 +2,7 @@ from typing import Optional, Union, List
 
 from autolightning import AutoModule, AutoCLI
 from autolightning.auto_cli import LoggerSaveConfigCallback
-
-
-def _merge_dicts(dict1: dict, dict2: dict):
-    """Code taken from: https://stackoverflow.com/a/58742155/11251769."""
-
-    for key, val in dict1.items():
-        if type(val) == dict:
-            if key in dict2 and type(dict2[key] == dict):
-                _merge_dicts(dict1[key], dict2[key])
-        else:
-            if key in dict2:
-                dict1[key] = dict2[key]
-
-    for key, val in dict2.items():
-        if not key in dict1:
-            dict1[key] = val
-
-    return dict1
+from autolightning.utils import merge_dicts
 
 
 def auto_main(config: Optional[Union[List[dict], dict]] = None, subcommand: Optional[str] = None, run: bool = True):
@@ -34,7 +17,7 @@ def auto_main(config: Optional[Union[List[dict], dict]] = None, subcommand: Opti
 
         if isinstance(config, list):
             for subconfig in config:
-                main_config = _merge_dicts(main_config, subconfig)
+                main_config = merge_dicts(main_config, subconfig)
         else:
             main_config = config
 
@@ -67,7 +50,7 @@ def auto_data(config: Union[List[dict], dict], config_includes_data_key: bool = 
 
     if isinstance(config, list):
         for subconfig in config:
-            final_config = _merge_dicts(final_config, subconfig)
+            final_config = merge_dicts(final_config, subconfig)
     else:
         final_config = config
 
