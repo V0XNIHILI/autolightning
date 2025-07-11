@@ -11,7 +11,7 @@ from ..types import AutoModuleKwargsNoCriterion, Unpack
 
 class ClassifierMixin:
     def __init__(self, top_k: int = 1, criterion: Optional[nn.Module] = None, **kwargs: Unpack[AutoModuleKwargsNoCriterion]):
-        if criterion == None:
+        if criterion is None:
             criterion = nn.CrossEntropyLoss()
 
         self.top_k = top_k

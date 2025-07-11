@@ -27,7 +27,7 @@ class LogKeyMixin:
         else:
             self.phase_mapping = {}
 
-        self.metric_mapping = {} if metric_mapping == None else metric_mapping
+        self.metric_mapping = {} if metric_mapping is None else metric_mapping
 
     def get_log_key(self, phase: Union[Phase , Literal["epoch"]], *metrics: str) -> str:
         if phase == "epoch":

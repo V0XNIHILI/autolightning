@@ -28,7 +28,7 @@ def distilled_shared_step(module: nn.Module, teacher_only: nn.Module, targets, *
     with torch.no_grad():
         teacher_outputs = teacher_only.eval()(*args, **kwargs)
 
-    if possible_features == None:
+    if possible_features is None:
         return (outputs, teacher_outputs, targets)
     
     return (outputs, teacher_outputs, possible_features, targets)
@@ -38,7 +38,7 @@ class DistilledMixin:
     def __init__(self, student_net: nn.Module, teacher_net: nn.Module, student_head_net: Optional[nn.Module] = None, student_regressor_net: Optional[nn.Module] = None, **kwargs: Unpack[AutoModuleKwargsNoNet]):
         super().__init__(net=None, **kwargs)
 
-        if student_head_net == None and student_regressor_net is not None:
+        if student_head_net is None and student_regressor_net is not None:
             raise ValueError("Cannot use student_regressor without student_head")
 
         self.student_net = student_net

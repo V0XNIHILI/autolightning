@@ -76,7 +76,7 @@ class AutoModule(L.LightningModule):
         self.net = net
         self.criterion = criterion
         self.optimizers_schedulers = {}
-        self.metrics = {} if metrics == None else metrics
+        self.metrics = {} if metrics is None else metrics
 
         self.register_optimizer(self, optimizer, lr_scheduler)
 
@@ -169,7 +169,7 @@ class AutoModule(L.LightningModule):
                     else:
                         raise TypeError(f"Invalid scheduler type: {type(scheduler)}; expected a callable")
             elif isinstance(optimizer, (list, tuple)):
-                assert scheduler == None, "Cannot use a list of optimizers with a scheduler"
+                assert scheduler is None, "Cannot use a list of optimizers with a scheduler"
 
                 if all(isinstance(opt, optim.Optimizer) for opt in optimizer):
                     optimizers.extend(optimizer)
@@ -183,7 +183,7 @@ class AutoModule(L.LightningModule):
                 else:
                     raise TypeError(f"Invalid optimizer type: {type(optimizer)}")
             elif isinstance(optimizer, dict):
-                assert scheduler == None, "Cannot use a dict of optimizers with a scheduler"
+                assert scheduler is None, "Cannot use a dict of optimizers with a scheduler"
 
                 if isinstance(module, nn.ModuleDict):
                     for key in optimizer:

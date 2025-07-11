@@ -245,7 +245,7 @@ class AutoDataModule(L.LightningDataModule):
     def setup(self, stage: str):
         datasets = instantiate_datasets(self.dataset)
 
-        if datasets == None:
+        if datasets is None:
             return
         
         relevant_phases = []
