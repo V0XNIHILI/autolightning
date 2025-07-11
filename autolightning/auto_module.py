@@ -59,27 +59,32 @@ class AutoModule(L.LightningModule):
         exclude_no_grad: bool = True,
         disable_prog_bar: bool = False,
     ):
-        """Lightweight wrapper around PyTorch Lightning LightningModule that adds support for a configuration dictionary.
-        Based on this configuration, it creates the model, criterion, optimizer, and scheduler. Overall, compared to the
-        PyTorch Lightning LightningModule, the following three attributes are added:
+        """
+        A lightweight wrapper around `LightningModule` that automates model, criterion, optimizer, scheduler,
+        and metric creation using a simple interface.
 
-        - `self.criterion`: the created criterion
-        - `self.shared_step(self, batch, batch_idx, phase)`: a generic step function that is shared across all steps (train, val, test, predict)
+        Key Features:
+        - `net`: main model or container module (e.g. `ModuleList`, `ModuleDict`)
+        - `criterion`: loss function
+        - `metrics`: optional dict of metric functions or metric config dicts
+        - `shared_step(batch, batch_idx, phase)`: user-implemented logic for a single step
+        - `shared_logged_step(phase, ...)`: wraps `shared_step`, computes loss, logs loss and metrics
+        - `configure_optimizers()`: supports single/multiple/dict/list optimizer and scheduler configurations
 
-        Based on these, the following methods are automatically implemented:
-
-        - `self.training_step(self, batch, batch_idx)`: calls `self.shared_step(batch, batch_idx, "train")`
-        - `self.validation_step(self, batch, batch_idx)`: calls `self.shared_step(batch, batch_idx, "val")`
-        - `self.test_step(self, batch, batch_idx)`: calls `self.shared_step(batch, batch_idx, "test")`
-        - `self.predict_step(self, batch, batch_idx)`: calls `self.shared_step(batch, batch_idx, "predict")`
-        - `self.configure_optimizers(self)`: creates the optimizer and scheduler based on the configuration dictionary
+        Automatically implements:
+        - `training_step`, `validation_step`, `test_step`, `predict_step` → delegate to `shared_logged_step`
+        - Optimizer and LR scheduler setup via `register_optimizer` and `configure_optimizers`
 
         Args:
-            net (Optional[CriterionNetType], optional): _description_. Defaults to None.
-            criterion (Optional[CriterionNetType], optional): _description_. Defaults to None.
-            optimizer (Optional[OptimizerType], optional): _description_. Defaults to None.
-            compiler (Optional[Callable], optional): A dict describing the compiler config or callable that compiles a net. Defaults to None.
-            metrics (Optional[MetricType], optional): _description_. Defaults to None
+            net: Model or module container
+            criterion: Loss function
+            optimizer: Optimizer instance or callable or list/dict of such
+            lr_scheduler: Scheduler instance, callable, or scheduler config dict
+            metrics: Dict of metric functions or config dicts
+            loss_log_key: Log key for loss (e.g. "loss", "nll", etc.)
+            log_metrics: Whether to log metrics
+            exclude_no_grad: Whether to exclude non-trainable parameters from optimizer
+            disable_prog_bar: If True, disables progress bar updates during validation
         """
 
         super().__init__()
@@ -276,12 +281,7 @@ class AutoModule(L.LightningModule):
             # TODO: maybe this functionality should be removed???
             for name, metric in self.metrics.items():
                 metric_func, metric_specific_log_kwargs = _resolve_metric(metric, default_log_kwargs)
-
-                self.log(
-                    f"{phase}/{name}",
-                    metric_func(*step_out),
-                    **metric_specific_log_kwargs,
-                )
+                self.log(f"{phase}/{name}", metric_func(*step_out), **metric_specific_log_kwargs)
         elif isinstance(step_out, dict):
             loss_computed = "loss" in step_out
             criterion_args_provided = "criterion_args" in step_out
@@ -309,6 +309,8 @@ class AutoModule(L.LightningModule):
                     metric_val, metric_specific_log_kwargs = _resolve_metric(val, curr_step_log_kwargs)
                     metrics_to_log.append((f"{phase}/{name}", (metric_val, metric_specific_log_kwargs)))
 
+            # TODO simplify this logic
+            # ========================================
             # Prioritize computed_metrics over derived metrics
             from collections import Counter
 
@@ -316,11 +318,14 @@ class AutoModule(L.LightningModule):
 
             for dup in dup_keys:
                 warnings.warn(f"Duplicate metric key '{dup}' found. Only pre-computed value will be logged.")
+            # ========================================
 
             for key, (val, metric_kwargs) in dict(metrics_to_log).items():
                 self.log(key, val, **metric_kwargs)
         else:
             loss = step_out
+
+        # TODO add support for custom loss logging kwargs
 
         if self.loss_log_key and loss is not None:
             self.log(f"{phase}/{self.loss_log_key}", loss, **default_log_kwargs)

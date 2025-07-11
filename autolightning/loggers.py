@@ -19,6 +19,10 @@ LOG_ORDER_OPTIONS = {"phase_first", "metric_first"}
 
 
 class LogKeyMixin:
+    """This mixin class makes it possible to use a custom log key format for the loggers without having to
+    change your logging code in the AutoModule class.
+    """
+
     def __init__(
         self,
         separator: str = "/",
@@ -47,6 +51,7 @@ class LogKeyMixin:
         self.metric_mapping = {} if metric_mapping is None else metric_mapping
 
     def get_log_key(self, phase: Union[Phase, Literal["epoch"]], *metrics: str) -> str:
+        # TODO: explain why this is necessary?
         if phase == "epoch":
             return "epoch"
 
@@ -69,7 +74,7 @@ class LogKeyMixin:
     def log_metrics(self, metrics: Mapping[str, float], step: Optional[int] = None) -> None:
         modified_metrics = {self.get_log_key(*key.split("/")): value for key, value in metrics.items()}
 
-        super().log_metrics(modified_metrics, step)
+        super().log_metrics(key_modified_metrics, step)
 
 
 class PandasLogger(Logger):

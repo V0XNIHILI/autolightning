@@ -289,6 +289,7 @@ class AutoDataModule(L.LightningDataModule):
         if self.seed is not None:
             generator = generator.manual_seed(self.seed)
 
+        # If we are dealing with a single dataset, we can apply the random split or cross-validation directly
         if isinstance(datasets, Dataset):
             if self.cross_val:
                 if not isinstance(self.cross_val, dict):
@@ -304,17 +305,12 @@ class AutoDataModule(L.LightningDataModule):
 
                 shuffle = self.seed is not None
 
-                kf = KFold(
-                    n_folds=self.cross_val[N_FOLDS_KEY],
-                    shuffle=shuffle,
-                    random_state=self.seed,
-                )
+                kf = KFold(n_splits=self.cross_val[N_FOLDS_KEY], shuffle=shuffle, random_state=self.seed)
 
-                for i, (train_indices, val_indices) in enumerate(kf.split(datasets)):
-                    if i == self.cross_val[FOLD_IDX_KEY]:
-                        self.instantiated_dataset["train"] = torch.utils.data.Subset(datasets, train_indices)
-                        self.instantiated_dataset["val"] = torch.utils.data.Subset(datasets, val_indices)
-                        break
+                current_fold = list(kf.split(datasets))[self.cross_val[FOLD_IDX_KEY]]
+                train_indices, val_indices = current_fold
+                self.instantiated_dataset["train"] = torch.utils.data.Subset(datasets, train_indices)
+                self.instantiated_dataset["val"] = torch.utils.data.Subset(datasets, val_indices)
             elif self.random_split:
                 if not isinstance(self.random_split, dict):
                     raise TypeError(
@@ -331,15 +327,17 @@ class AutoDataModule(L.LightningDataModule):
                 for phase_key in relevant_phases:
                     self.instantiated_dataset[phase_key] = datasets[phase_key]
             else:
-                for phase_key in relevant_phases:
-                    if phase_key != "train":
-                        warnings.warn(
-                            f"Only one dataset was specified, but it will be used for multiple phases: {relevant_phases}"
-                        )
+                if stage == "fit":
+                    warnings.warn(
+                        f"Only one dataset was specified, but it will be used for multiple phases: {relevant_phases}"
+                    )
 
+                for phase_key in relevant_phases:
                     self.instantiated_dataset[phase_key] = datasets
         else:
             instantiate_dataset_keys = []
+
+            # TODO: clean up this default logic, I am not even sure it is being used by anything
 
             for phase_key in relevant_phases:
                 if phase_key in instantiate_dataset_keys:
@@ -414,7 +412,9 @@ class AutoDataModule(L.LightningDataModule):
     def get_transformed_dataset(self, phase: Phase):
         dataset = self.get_dataset(phase)
 
-        if (isinstance(self.pre_load, bool) and self.pre_load) or (isinstance(self.pre_load, dict) and self.pre_load.get(phase, False)):
+        if (isinstance(self.pre_load, bool) and self.pre_load) or (
+            isinstance(self.pre_load, dict) and self.pre_load.get(phase, False)
+        ):
             pre_load_tf = None
             pre_load_target_tf = None
 
