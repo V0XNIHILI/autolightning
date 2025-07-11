@@ -72,7 +72,7 @@ class LogKeyMixin:
 
     @rank_zero_only
     def log_metrics(self, metrics: Mapping[str, float], step: Optional[int] = None) -> None:
-        modified_metrics = {self.get_log_key(*key.split("/")): value for key, value in metrics.items()}
+        key_modified_metrics = {self.get_log_key(*key.split("/")): value for key, value in metrics.items()}
 
         super().log_metrics(key_modified_metrics, step)
 
