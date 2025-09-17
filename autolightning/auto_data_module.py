@@ -24,7 +24,7 @@ ARGS_KEY = "args"
 FOLD_IDX_KEY = "fold_idx"
 N_FOLDS_KEY = "n_folds"
 
-AllDatasetsType = Union[Dataset, IterableDataset]
+AllDatasetsType = Union[Dataset, IterableDataset, Dict[str, Union[str, Dict]]]
 TransformType = Union[Dict[str, TransformValue], TransformValue]
 
 
@@ -162,7 +162,7 @@ def apply_batch_transforms(batch, key: str, transforms: dict, target_batch_trans
 class AutoDataModule(L.LightningDataModule):
 
     def __init__(self,
-                 dataset: Optional[Union[Dict[str, AllDatasetsType], AllDatasetsType]] = None,
+                 dataset: Optional[Union[Dict[str, Union[Dataset, IterableDataset]], AllDatasetsType]] = None,
                  dataloaders: Optional[Dict] = None,
                  transforms: Optional[TransformType] = None,
                  target_transforms: Optional[TransformType] = None,
