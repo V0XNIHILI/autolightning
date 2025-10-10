@@ -13,7 +13,7 @@ class RootDownloadTrain(AutoDataModule):
     ):
         super().__init__(
             dataset={
-                "class": f"torchvision.datasets.{name}" if "." not in name else name,
+                "class_name": f"torchvision.datasets.{name}" if "." not in name else name,
                 "args": dict(
                     defaults=dict(root=root, train=True, download=download),
                     test=dict(train=False),
