@@ -116,6 +116,9 @@ class ActionConfigFilePython(ActionConfigFile):
             else:
                 config_name = "config"
 
+            if not hasattr(module, config_name):
+                raise AttributeError(f"The file '{module_name}.py' does not have a variable named '{config_name}'.")
+            
             variable: Union[Callable[[], Dict], Dict] = getattr(module, config_name)
 
             if callable(variable):
