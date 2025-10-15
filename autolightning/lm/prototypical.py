@@ -1,6 +1,6 @@
 from typing import Literal
 
-from typing import Tuple, List
+from typing import Tuple, List, Callable, Optional
 
 import torch
 import torch.nn as nn
@@ -26,6 +26,8 @@ MetricType = Literal[
     "cosine",
 ]
 
+from torchvision.transforms.v2 import Transform
+
 
 UNKNOWN_METRIC_MESSAGE = "Must be one of [euclidean, euclidean-squared, manhattan, dot, cosine, logistic-regression]"
 
@@ -38,6 +40,7 @@ def prototypical_forward(
     metric: str,
     average_support_embeddings: bool,
     batch_transform: OptionalBatchTransform = None,
+    support_embedding_transform: Optional[nn.Module] = None,
 ):
     # It is assumed that the train labels are structured like [0] * k_shot + [1] * k_shot, ...
     # and the evaluation labels are structured like [0] * k_query_shot + [1] * k_query_shot, ...
@@ -48,8 +51,12 @@ def prototypical_forward(
         data = batch_transform(data)
 
     embeddings = embedder(data)
+
     support_embeddings = embeddings[: train_data.size(0)]
     query_embeddings = embeddings[train_data.size(0) :]
+
+    if support_embedding_transform is not None:
+        support_embeddings = support_embedding_transform(support_embeddings)
 
     k_shot = len(train_labels) // len(torch.unique(train_labels))
 
@@ -132,12 +139,14 @@ class PrototypicalMixin:
         self,
         metric: MetricType = "euclidean",
         average_support_embeddings: bool = True,
+        support_embedding_transform: Optional[nn.Module] = None,
         **kwargs: Unpack[AutoModuleKwargs],
     ):
         super().__init__(**kwargs)
 
         self.metric = metric
         self.average_support_embeddings = average_support_embeddings
+        self.support_embedding_transform = support_embedding_transform
 
 
 class Prototypical(PrototypicalMixin, Classifier):
@@ -149,6 +158,7 @@ class Prototypical(PrototypicalMixin, Classifier):
             train_labels,
             self.metric,
             self.average_support_embeddings,
+            support_embedding_transform=self.support_embedding_transform,
         )
 
     def shared_step(self, phase: str, batch, batch_idx):
