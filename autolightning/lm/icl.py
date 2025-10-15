@@ -20,6 +20,9 @@ def icl_forward(
     batch = X_train.size(0)
 
     if sample_embedder is not None:
+        # X_train: (batch, n_train_samples, ...)
+        # X_test: (batch, n_test_samples, ...)
+
         if combine_batch_and_samples:
             # Combine first and second dimension
             X_train = X_train.view(-1, *X_train.size()[2:])  # (batch * n_train_samples, ...)
@@ -31,6 +34,9 @@ def icl_forward(
         if combine_batch_and_samples:
             X_train = X_train.view(batch, -1, *X_train.size()[1:])  # (batch, n_train_samples, ...)
             X_test = X_test.view(batch, -1, *X_test.size()[1:])  # (batch, n_test_samples, ...)
+
+        # X_train: (batch, n_train_samples, ...)
+        # X_test: (batch, n_test_samples, ...)
 
     if merge_data_strategy == "flatten":
         X_train_test = torch.cat([X_train, X_test], dim=1).view(
@@ -45,6 +51,10 @@ def icl_forward(
             [X_train_test, y_train], dim=1
         )  # (batch, (n_train_samples + n_test_samples) * total_n_features + n_train_samples * n_label_features)
     elif merge_data_strategy == "transpose":
+        assert X_train.shape[2:] == y_train.shape[2:], (
+            "X and y should have the same number of features for the transpose strategy to work"
+        )
+
         X = torch.cat(
             [X_train, y_train, X_test], dim=1
         )  # (batch, 2 * n_train_samples + n_test_samples, total_n_features)
@@ -76,6 +86,7 @@ class ICLMixin:
     def __init__(
         self,
         sample_embedder: Optional[nn.Module] = None,
+        label_embedder: Optional[nn.Module] = None,
         merge_data_strategy: str = "flatten",
         combine_batch_and_samples: bool = False,
         **kwargs: Unpack[AutoModuleKwargs],
@@ -83,12 +94,15 @@ class ICLMixin:
         super().__init__(**kwargs)
 
         self.sample_embedder = sample_embedder
+        self.label_embedder = label_embedder
         self.merge_data_strategy = merge_data_strategy
         self.combine_batch_and_samples = combine_batch_and_samples
 
 
 class ICL(ICLMixin, Supervised):
     def forward(self, X_train, y_train, X_test):
+        y_train = self.label_embedder(y_train) if self.label_embedder is not None else y_train
+
         return icl_forward(
             self.net,
             X_train,
@@ -103,21 +117,13 @@ class ICL(ICLMixin, Supervised):
         return icl_shared_step(self, batch)
 
 
-class ICLClassifierKwargs(ICLKwargs, AutoModuleKwargs):
+class ICLClassifier(ClassifierMixin, ICL):
     pass
 
 
-class ICLClassifier(ClassifierMixin, ICL):
-    def __init__(
-        self,
-        label_embedder: Optional[nn.Module] = None,
-        **kwargs: Unpack[ICLClassifierKwargs],
-    ):
-        super().__init__(**kwargs)
+class RelationNet:
+    pass  # y_train is [], X_train is support, X_test is query
 
-        self.label_embedder = label_embedder
 
-    def forward(self, X_train, y_train, X_test):
-        y_train = self.label_embedder(y_train) if self.label_embedder is not None else y_train
-
-        return super().forward(X_train, y_train, X_test)
+class ZeroShotRelationNet:
+    pass  # y_train is context vectors, X_train is [], X_test is query
