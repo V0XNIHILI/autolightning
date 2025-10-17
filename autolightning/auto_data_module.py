@@ -29,7 +29,7 @@ ARGS_KEY = "args"
 FOLD_IDX_KEY = "fold_idx"
 N_FOLDS_KEY = "n_folds"
 
-AllDatasetsType = Union[Dataset, IterableDataset]
+AllDatasetsType = Union[Dataset, IterableDataset, Dict]
 TransformType = Union[Dict[str, TransformValue], TransformValue]
 
 
