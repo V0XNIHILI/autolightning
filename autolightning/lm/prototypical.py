@@ -92,11 +92,10 @@ def prototypical_forward(
     elif metric == "manhattan":
         similarities = -torch.cdist(query_embeddings, support_embeddings, p=1)
     elif metric == "cosine":
-        similarities = F.cosine_similarity(
-            query_embeddings.unsqueeze(1),  # Shape: (total_queries, 1, embedding_dim)
-            support_embeddings.unsqueeze(0),  # Shape: (1, support_size, embedding_dim)
-            dim=2,  # Compute cosine similarity along the embedding dimension
-        )
+        query_norms = F.normalize(query_embeddings, dim=1)
+        support_norms = F.normalize(support_embeddings, dim=1)
+
+        similarities = query_norms @ support_norms.T
     else:
         raise ValueError(f"Unknown metric: {metric}. {UNKNOWN_METRIC_MESSAGE}")
 
