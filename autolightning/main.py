@@ -1,4 +1,6 @@
 from typing import Optional, Union, List
+from pathlib import Path
+import yaml
 
 from autolightning import AutoModule, AutoCLI
 from autolightning.auto_cli import LoggerSaveConfigCallback
@@ -6,7 +8,7 @@ from autolightning.utils import merge_dicts
 
 
 def auto_main(
-    config: Optional[Union[List[dict], dict]] = None,
+    config: Optional[Union[List[dict], dict, List[str], List[Path]]] = None,
     subcommand: Optional[str] = None,
     run: bool = True,
 ):
@@ -21,6 +23,10 @@ def auto_main(
 
         if isinstance(config, list):
             for subconfig in config:
+                # TODOOO make function out of Python file loading as well
+                if isinstance(subconfig, (str, Path)):
+                    with open(subconfig, "r") as f:
+                        subconfig = yaml.safe_load(f)
                 main_config = merge_dicts(main_config, subconfig)
         else:
             main_config = config
