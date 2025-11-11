@@ -96,7 +96,7 @@ class AutoModule(L.LightningModule):
 
         self.register_optimizer(self, optimizer, lr_scheduler)
 
-        self.metrics = self.metrics | self.configure_metrics()
+        self.metrics = self.configure_metrics() | self.metrics
 
         self.loss_log_key = loss_log_key
         self.log_metrics = log_metrics
