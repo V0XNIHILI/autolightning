@@ -55,9 +55,6 @@ def prototypical_forward(
     support_embeddings = embeddings[: train_data.size(0)]
     query_embeddings = embeddings[train_data.size(0) :]
 
-    if support_embedding_transform is not None:
-        support_embeddings = support_embedding_transform(support_embeddings)
-
     k_shot = len(train_labels) // len(torch.unique(train_labels))
 
     if average_support_embeddings:
@@ -67,6 +64,9 @@ def prototypical_forward(
 
         if metric == "logistic-regression":
             raise ValueError("Cannot use logistic regression with average support embeddings")
+        
+    if support_embedding_transform is not None:
+        support_embeddings = support_embedding_transform(support_embeddings)
 
     if metric.startswith("euclidean"):
         similarities = -torch.cdist(query_embeddings, support_embeddings)
