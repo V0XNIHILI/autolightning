@@ -12,18 +12,20 @@ def before_after_batch_transfer_flatten(
     on_before_after_method,
     batch,
     dataloader_idx: int,
-    transform_flattened: Optional[str] = None # "train", "query", or "both"; None means no flattening
+    batch_transform_flattened: Optional[str] = None # "train", "query", or "both"; None means no flattening
 ):
     ((X_support, y_support), (X_query, y_query)) = batch
 
-    if transform_flattened:
-        if transform_flattened == "train":
+    if batch_transform_flattened:
+        if batch_transform_flattened == "train":
             X_all, y_all = X_support, y_support
-        elif transform_flattened == "query":
+        elif batch_transform_flattened == "query":
             X_all, y_all = X_query, y_query
-        else:  # both
+        elif batch_transform_flattened == "both":
             X_all = torch.cat([X_support, X_query], dim=0)
             y_all = torch.cat([y_support, y_query], dim=0)
+        else:
+            raise ValueError(f"Unknown batch_transform_flattened value: {batch_transform_flattened}. Should be one of 'train', 'query', 'both', or None.")
 
         X_all = X_all.view(-1, *X_all.shape[2:])
         y_all = y_all.view(-1)
@@ -31,13 +33,13 @@ def before_after_batch_transfer_flatten(
 
     batch = on_before_after_method(batch, dataloader_idx)
 
-    if transform_flattened:
+    if batch_transform_flattened:
         X_all, y_all = batch
-        if transform_flattened == "train":
-            X_support = X_all.view(y_support.shape[0], y_support.shape[1], *X_all.shape[1:])
+        if batch_transform_flattened == "train":
+            X_support = X_all.view(X_support.shape[0], X_support.shape[1], *X_all.shape[1:])
             y_support = y_all.view(y_support.shape)
-        elif transform_flattened == "query":
-            X_query = X_all.view(y_query.shape[0], y_query.shape[1], *X_all.shape[1:])
+        elif batch_transform_flattened == "query":
+            X_query = X_all.view(X_query.shape[0], X_query.shape[1], *X_all.shape[1:])
             y_query = y_all.view(y_query.shape)
         else:  # both
             num_x_support = y_support.shape[0] * y_support.shape[1]
@@ -62,8 +64,8 @@ class FewShotMixin:
         train_query_shots: int = -1,
         keep_original_labels: bool = False,
         shuffle_labels: bool = False,
-        samples_per_class: Optional[Dict[str, int]] = None,
-        transform_flattened: Optional[Union[str, Dict[str, Optional[str]]]] = None,
+        samples_per_class: Optional[Dict[str, Union[str, int]]] = None,
+        batch_transform_flattened: Optional[Union[str, Dict[str, Optional[str]]]] = None,
         **kwargs: Unpack[AutoDataModuleKwargs],
     ):
         super().__init__(**kwargs)
@@ -77,7 +79,7 @@ class FewShotMixin:
         self.keep_original_labels = keep_original_labels
         self.shuffle_labels = shuffle_labels
         self.samples_per_class = samples_per_class
-        self.transform_flattened = transform_flattened
+        self.batch_transform_flattened = batch_transform_flattened
 
     def get_transformed_dataset(self, phase: str):
         dataset = super().get_transformed_dataset(phase)
@@ -105,17 +107,17 @@ class FewShotMixin:
 
     def on_before_batch_transfer(self, batch, dataloader_idx: int):
         flatten = (
-            self.transform_flattened
-            if isinstance(self.transform_flattened, str)
-            else self.transform_flattened.get("before", None)
+            self.batch_transform_flattened
+            if isinstance(self.batch_transform_flattened, str)
+            else self.batch_transform_flattened.get("before", None)
         )
         return before_after_batch_transfer_flatten(super().on_before_batch_transfer, batch, dataloader_idx, flatten)
 
     def on_after_batch_transfer(self, batch, dataloader_idx: int):
         flatten = (
-            self.transform_flattened
-            if isinstance(self.transform_flattened, str)
-            else self.transform_flattened.get("after", None)
+            self.batch_transform_flattened
+            if isinstance(self.batch_transform_flattened, str)
+            else self.batch_transform_flattened.get("after", None)
         )
         return before_after_batch_transfer_flatten(super().on_after_batch_transfer, batch, dataloader_idx, flatten)
 
