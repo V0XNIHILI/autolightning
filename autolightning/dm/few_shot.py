@@ -106,20 +106,20 @@ class FewShotMixin:
         )
 
     def on_before_batch_transfer(self, batch, dataloader_idx: int):
-        flatten = (
+        flatten_style = (
             self.batch_transform_flattened
             if isinstance(self.batch_transform_flattened, str)
             else self.batch_transform_flattened.get("before", None)
         )
-        return before_after_batch_transfer_flatten(super().on_before_batch_transfer, batch, dataloader_idx, flatten)
+        return before_after_batch_transfer_flatten(super().on_before_batch_transfer, batch, dataloader_idx, flatten_style)
 
     def on_after_batch_transfer(self, batch, dataloader_idx: int):
-        flatten = (
+        flatten_style = (
             self.batch_transform_flattened
             if isinstance(self.batch_transform_flattened, str)
             else self.batch_transform_flattened.get("after", None)
         )
-        return before_after_batch_transfer_flatten(super().on_after_batch_transfer, batch, dataloader_idx, flatten)
+        return before_after_batch_transfer_flatten(super().on_after_batch_transfer, batch, dataloader_idx, flatten_style)
 
 
 class FewShot(FewShotMixin, AutoDataModule):
