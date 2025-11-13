@@ -39,17 +39,12 @@ def icl_forward(
         X_train = embed(X_train, sample_embedder)
         X_test = embed(X_test, query_sample_embedder)
 
-    # print(f"X_train shape after embedding: {X_train.shape}")
-    # print(f"X_test shape after embedding: {y_train.shape}")
-
     X = None
 
     if merge_embedding_strategy.startswith("flatten"):
         X_train_test = torch.cat([X_train, X_test], dim=1).view(
             batch, -1
         )  # (batch, (n_train_samples + n_test_samples) * total_n_features)
-
-        # print(f"X_train_test shape after flattening: {X_train_test.shape}")
 
         if merge_embedding_strategy == "flatten_without_labels":
             X = X_train_test
