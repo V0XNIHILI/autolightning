@@ -12,31 +12,39 @@ def before_after_batch_transfer_flatten(
     on_before_after_method,
     batch,
     dataloader_idx: int,
-    flatten_for_batch_transform: bool,
+    transform_flattened: Optional[str] = None # "train", "query", or "both"; None means no flattening
 ):
-    if flatten_for_batch_transform:
-        ((X_support, y_support), (X_query, y_query)) = batch
+    ((X_support, y_support), (X_query, y_query)) = batch
 
-        # Concat X_support and X_query along the batch dimension
-        X_all = torch.cat([X_support, X_query], dim=0)
-        # Combine first and second dimension
+    if transform_flattened:
+        if transform_flattened == "train":
+            X_all, y_all = X_support, y_support
+        elif transform_flattened == "query":
+            X_all, y_all = X_query, y_query
+        else:  # both
+            X_all = torch.cat([X_support, X_query], dim=0)
+            y_all = torch.cat([y_support, y_query], dim=0)
+
         X_all = X_all.view(-1, *X_all.shape[2:])
-
-        y_all = torch.cat([y_support, y_query], dim=0)
         y_all = y_all.view(-1)
-
         batch = (X_all, y_all)
 
     batch = on_before_after_method(batch, dataloader_idx)
 
-    if flatten_for_batch_transform:
-        # Split X_all into X_support and X_query
+    if transform_flattened:
         X_all, y_all = batch
-        num_x_support = y_support.shape[0] * y_support.shape[1]
-        X_support = X_all[:num_x_support].view(y_support.shape[0], y_support.shape[1], *X_all.shape[1:])
-        X_query = X_all[num_x_support:].view(y_query.shape[0], y_query.shape[1], *X_all.shape[1:])
-        y_support = y_all[:num_x_support].view(y_support.shape)
-        y_query = y_all[num_x_support:].view(y_query.shape)
+        if transform_flattened == "train":
+            X_support = X_all.view(y_support.shape[0], y_support.shape[1], *X_all.shape[1:])
+            y_support = y_all.view(y_support.shape)
+        elif transform_flattened == "query":
+            X_query = X_all.view(y_query.shape[0], y_query.shape[1], *X_all.shape[1:])
+            y_query = y_all.view(y_query.shape)
+        else:  # both
+            num_x_support = y_support.shape[0] * y_support.shape[1]
+            X_support = X_all[:num_x_support].view(y_support.shape[0], y_support.shape[1], *X_all.shape[1:])
+            X_query = X_all[num_x_support:].view(y_query.shape[0], y_query.shape[1], *X_all.shape[1:])
+            y_support = y_all[:num_x_support].view(y_support.shape)
+            y_query = y_all[num_x_support:].view(y_query.shape)
 
         batch = ((X_support, y_support), (X_query, y_query))
 
@@ -55,7 +63,7 @@ class FewShotMixin:
         keep_original_labels: bool = False,
         shuffle_labels: bool = False,
         samples_per_class: Optional[Dict[str, int]] = None,
-        flatten_for_batch_transform: Union[bool, Dict[str, bool]] = False,
+        transform_flattened: Optional[Union[str, Dict[str, Optional[str]]]] = None,
         **kwargs: Unpack[AutoDataModuleKwargs],
     ):
         super().__init__(**kwargs)
@@ -69,7 +77,7 @@ class FewShotMixin:
         self.keep_original_labels = keep_original_labels
         self.shuffle_labels = shuffle_labels
         self.samples_per_class = samples_per_class
-        self.flatten_for_batch_transform = flatten_for_batch_transform
+        self.transform_flattened = transform_flattened
 
     def get_transformed_dataset(self, phase: str):
         dataset = super().get_transformed_dataset(phase)
@@ -97,17 +105,17 @@ class FewShotMixin:
 
     def on_before_batch_transfer(self, batch, dataloader_idx: int):
         flatten = (
-            self.flatten_for_batch_transform
-            if isinstance(self.flatten_for_batch_transform, bool)
-            else self.flatten_for_batch_transform.get("before", False)
+            self.transform_flattened
+            if isinstance(self.transform_flattened, str)
+            else self.transform_flattened.get("before", None)
         )
         return before_after_batch_transfer_flatten(super().on_before_batch_transfer, batch, dataloader_idx, flatten)
 
     def on_after_batch_transfer(self, batch, dataloader_idx: int):
         flatten = (
-            self.flatten_for_batch_transform
-            if isinstance(self.flatten_for_batch_transform, bool)
-            else self.flatten_for_batch_transform.get("after", False)
+            self.transform_flattened
+            if isinstance(self.transform_flattened, str)
+            else self.transform_flattened.get("after", None)
         )
         return before_after_batch_transfer_flatten(super().on_after_batch_transfer, batch, dataloader_idx, flatten)
 
