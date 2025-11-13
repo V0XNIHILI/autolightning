@@ -42,7 +42,8 @@ def _import_module(module_path: str, default_module: Optional[str] = None) -> An
 def load(
     module: nn.Module,
     file_path: str,
-    submodule_path: Optional[str],
+    state_dict_submodule: Optional[str] = None,
+    module_submodule: Optional[str] = None,
     strict: bool = True,
     assign: bool = False,
     **kwargs: Any,
@@ -53,17 +54,21 @@ def load(
     if all(key in state_dict for key in LIGHTNING_STATE_DICT_KEYS):
         state_dict = state_dict["state_dict"]
 
-    if submodule_path is not None:
+    if state_dict_submodule is not None:
         new_state_dict = {}
 
         # Make sure only the sub state dict at the submodule_path is loaded
         for key in state_dict:
-            if key.startswith(submodule_path):
-                new_state_dict[key[len(submodule_path) + 1 :]] = state_dict[key]
+            if key.startswith(state_dict_submodule):
+                new_state_dict[key[len(state_dict_submodule) + 1 :]] = state_dict[key]
 
         state_dict = OrderedDict(new_state_dict)
 
-    module.load_state_dict(state_dict, strict=strict, assign=assign)
+    if module_submodule is not None:
+        submodule: nn.Module = getattr(module, module_submodule)
+        submodule.load_state_dict(state_dict, strict=strict, assign=assign)
+    else:
+        module.load_state_dict(state_dict, strict=strict, assign=assign)
 
     return module
 
