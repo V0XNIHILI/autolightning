@@ -8,7 +8,7 @@ from autolightning.utils import merge_dicts
 
 
 def auto_main(
-    config: Optional[Union[List[dict], dict, List[str], List[Path]]] = None,
+    config: Optional[Union[List[dict], dict, List[str], List[Path], str, Path]] = None,
     subcommand: Optional[str] = None,
     run: bool = True,
 ):
@@ -20,6 +20,9 @@ def auto_main(
             assert subcommand is not None, "subcommand must be provided if run is True and config is not None."
         else:
             assert subcommand is None, "subcommand must be None if run is False and config is not None."
+
+        if isinstance(config, (str, Path)):
+            config = [config]
 
         if isinstance(config, list):
             for subconfig in config:
