@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Union, Literal
 
 import torch
 
@@ -104,21 +104,23 @@ class FewShotMixin:
             shuffle_labels=self.shuffle_labels,
             samples_per_class=self.samples_per_class[phase] if self.samples_per_class else None,
         )
+    
+    def get_flatten_style(self, moment: Literal["before", "after"]):
+        if isinstance(self.batch_transform_flattened, str):
+            flatten_style = self.batch_transform_flattened
+        elif self.batch_transform_flattened is not None:
+            flatten_style = self.batch_transform_flattened.get(moment, None)
+        else:
+            flatten_style = None
+
+        return flatten_style
 
     def on_before_batch_transfer(self, batch, dataloader_idx: int):
-        flatten_style = (
-            self.batch_transform_flattened
-            if isinstance(self.batch_transform_flattened, str)
-            else self.batch_transform_flattened.get("before", None)
-        )
+        flatten_style = self.get_flatten_style("before")
         return before_after_batch_transfer_flatten(super().on_before_batch_transfer, batch, dataloader_idx, flatten_style)
 
     def on_after_batch_transfer(self, batch, dataloader_idx: int):
-        flatten_style = (
-            self.batch_transform_flattened
-            if isinstance(self.batch_transform_flattened, str)
-            else self.batch_transform_flattened.get("after", None)
-        )
+        flatten_style = self.get_flatten_style("after")
         return before_after_batch_transfer_flatten(super().on_after_batch_transfer, batch, dataloader_idx, flatten_style)
 
 
