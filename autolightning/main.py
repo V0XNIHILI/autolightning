@@ -7,6 +7,18 @@ from autolightning.auto_cli import LoggerSaveConfigCallback
 from autolightning.utils import merge_dicts
 
 
+def get_auto_cli(args, run: bool):
+    return AutoCLI(
+        AutoModule,
+        args=args,
+        run=run,
+        subclass_mode_model=True,
+        save_config_kwargs={"overwrite": True},
+        parser_kwargs={"parser_mode": "omegaconf"},
+        save_config_callback=LoggerSaveConfigCallback,
+    )
+
+
 def auto_main(
     config: Optional[Union[List[dict], dict, List[str], List[Path], str, Path]] = None,
     subcommand: Optional[str] = None,
@@ -45,15 +57,7 @@ def auto_main(
         assert subcommand is None, "subcommand must be None if config is None."
         assert run, "run must be True if config is None."
 
-    cli = AutoCLI(
-        AutoModule,
-        args=final_config,
-        run=run,
-        subclass_mode_model=True,
-        save_config_kwargs={"overwrite": True},
-        parser_kwargs={"parser_mode": "omegaconf"},
-        save_config_callback=LoggerSaveConfigCallback,
-    )
+    cli = get_auto_cli(final_config, run)
 
     return cli.trainer, cli.model, cli.datamodule
 
