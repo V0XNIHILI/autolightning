@@ -27,7 +27,6 @@ dependencies = [
 
 [project.scripts]
 autolightning = "autolightning.main:cli_main"
-auto-wandb-sweep = "autolightning.sweeps.wandb:main"
 
 [build-system]
 requires = ["hatchling"]

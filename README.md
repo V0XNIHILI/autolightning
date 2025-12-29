@@ -423,25 +423,56 @@ done
 
 #### Using Weights & Biases
 
-```python
-sweep_configuration = {
-    'method': 'grid',
-    'name': 'Example Sweep',
-    'command': ['python', '${program}', '--config', yaml_conf, '${args_no_hyphens}'],
-    'program': "autolightning",
-    'parameters': {
-        'model.init_args.learning_rate': {
-            'values': [0.001, 0.01, 0.1]
-        }
-    },
-    'metric': {
-        'name': 'val_loss',
-        'goal': 'minimize'
-    }
-}
+Create a WandB sweep config, find an example below:
+
+```yaml
+name: omniglot_proto_net_sweep
+method: bayes
+metric:
+  name: val/loss
+  goal: minimize
+early_terminate:
+  type: hyperband
+  min_iter: 3
+  eta: 3
+  strict: true
+parameters:
+  optimizer:
+    parameters:
+      init_args:
+        parameters:
+          lr: {'max': 0.1, 'min': 1e-5, 'distribution': 'log_uniform_values'}
+          weight_decay: {'max': 5e-4, 'min': 1e-5, 'distribution': 'log_uniform_values'}
+command:
+- autolightning
+- fit
+- -c
+- ./proto_net.yaml
+- -c
+- ./few_shot_data.yaml
+- -c
+- ../machine_specific/lug.py
+- -c
+- ../machine_specific/project_settings.yaml
+- -c
+- //wandb_sweep
 ```
 
-Use the `AutoWandbLogger` in your configuration to track results.
+In order for WandB sweeps to work plug-and-play with AutoLightning, make sure to include the `-c //wandb_sweep` argument in the arguments list for the command.
+
+Then, to initialize the sweep, run:
+
+```bash
+wandb sweep <name of sweep config file>.yaml -p <project name>
+```
+
+This command will print a message with the sweep id. Finally, to start the sweep experiments, run:
+
+```bash
+wandb agent <wandb username>/<project name>/<sweep id>
+```
+
+Make sure to use the `AutoWandbLogger` to track results.
 
 #### Using Ray Tune or Optuna
 
