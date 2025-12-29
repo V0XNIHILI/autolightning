@@ -318,12 +318,7 @@ class AutoCLI(LightningCLI):
             self.trainer.logger.experiment.unwatch(models)
 
     def before_instantiate_classes(self):
-        if self.subcommand is None:
-            cfg = self.config
-        else:
-            cfg = self.config[self.subcommand]
-
-        torch_cfg = cfg["torch"]
+        torch_cfg = self.config_dump["torch"]
         torch_autograd_cfg = torch_cfg["autograd"]
         torch_backends_cfg = torch_cfg["backends"]
         torch_backends_cudnn_cfg = torch_backends_cfg["cudnn"]
