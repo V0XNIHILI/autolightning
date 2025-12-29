@@ -78,7 +78,6 @@ def transform_config(config: Dict[str, Any]) -> Dict[str, Any]:
     sweep_param_config = cli.parser.dump(cli.config, skip_none=True)  # Required for proper reproducibility
     sweep_param_config = yaml.safe_load(sweep_param_config)
 
-    # IDEALLY HERE YOU RUN THE ABOVE COMMAND INSIDE PYTHON AND EXTRACT THE CONFIG
     # Update the sweep config with the variable parameters
     sweep_param_config = copy.deepcopy(sweep_param_config)
 
@@ -151,7 +150,7 @@ def main() -> None:
     config = load_yaml(args.config_yaml)
     config = transform_config(config)
 
-    sweep_id = wandb.sweep(
+    wandb.sweep(
         sweep=config,
         project=args.project,
         entity=args.entity,
