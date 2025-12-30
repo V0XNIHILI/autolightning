@@ -19,13 +19,31 @@ def get_auto_cli(args, run: bool):
     )
 
 
+def build_config(config: Union[List[dict], dict, List[str], List[Path], str, Path]):
+    if isinstance(config, (str, Path)):
+        config = [config]
+
+    main_config = {}
+
+    if isinstance(config, list):
+        for subconfig in config:
+            # TODOOO make function out of Python file loading as well
+            if isinstance(subconfig, (str, Path)):
+                with open(subconfig, "r") as f:
+                    subconfig = yaml.safe_load(f)
+            main_config = merge_dicts(main_config, subconfig)
+    else:
+        main_config = config
+
+    return main_config
+
+
 def auto_main(
     config: Optional[Union[List[dict], dict, List[str], List[Path], str, Path]] = None,
     subcommand: Optional[str] = None,
     run: bool = True,
 ):
     final_config = None
-    main_config = {}
 
     if config is not None:
         if run:
@@ -33,19 +51,7 @@ def auto_main(
         else:
             assert subcommand is None, "subcommand must be None if run is False and config is not None."
 
-        if isinstance(config, (str, Path)):
-            config = [config]
-
-        if isinstance(config, list):
-            for subconfig in config:
-                # TODOOO make function out of Python file loading as well
-                if isinstance(subconfig, (str, Path)):
-                    with open(subconfig, "r") as f:
-                        subconfig = yaml.safe_load(f)
-                main_config = merge_dicts(main_config, subconfig)
-        else:
-            main_config = config
-
+        main_config = build_config(config)
         final_config = {}
 
         if subcommand is not None:
@@ -62,14 +68,8 @@ def auto_main(
     return cli.trainer, cli.model, cli.datamodule
 
 
-def auto_data(config: Union[List[dict], dict], config_includes_data_key: bool = True):
-    final_config = {}
-
-    if isinstance(config, list):
-        for subconfig in config:
-            final_config = merge_dicts(final_config, subconfig)
-    else:
-        final_config = config
+def auto_data(config: Union[List[dict], dict, List[str], List[Path], str, Path], config_includes_data_key: bool = True):
+    final_config = build_config(config)
 
     if not config_includes_data_key:
         final_config = {"data": final_config}
