@@ -7,10 +7,17 @@ import torch.nn as nn
 from lightning.pytorch.utilities.types import STEP_OUTPUT
 
 from brevitas.inject import _InjectorType
-from brevitas.graph.calibrate import bias_correction_mode, calibration_mode, norm_correction_mode
+from brevitas.graph.calibrate import (
+    bias_correction_mode,
+    calibration_mode,
+    norm_correction_mode,
+)
 
 import brevitas
-from brevitas_utils import create_qat_ready_model, allow_quant_tensor_slicing as allow_slicing
+from brevitas_utils import (
+    create_qat_ready_model,
+    allow_quant_tensor_slicing as allow_slicing,
+)
 from brevitas_utils.creation import create_quantizer
 from brevitas_utils.bias_correction import add_zero_bias_to_linear
 
@@ -37,23 +44,25 @@ class BrevitasMixin:
     # type check using jsonargparse. I get this error mainly:
     # - 'Injector' can not resolve attribute '__origin__'
 
-    def __init__(self,
-                 weight_quant: Optional[_InjectorType] = None,
-                 act_quant: Optional[_InjectorType] = None,
-                 bias_quant: Optional[_InjectorType] = None,
-                 in_quant: Optional[_InjectorType] = None,
-                 out_quant: Optional[_InjectorType] = None,
-                 load_float_weights_into_model: bool = True,
-                 remove_dropout_layers: bool = True,
-                 fold_batch_norm_layers: bool = True,
-                 allow_quant_tensor_slicing: bool = False,
-                 enable_brevitas_jit: bool = False,
-                 calibrate: bool = False,
-                 correct_biases: bool = False,
-                 correct_norms: bool = False,
-                 skip_modules: Optional[List[Union[type[nn.Module], str]]] = None,
-                 limit_calibration_batches: Optional[int] = None,
-                 **kwargs: Unpack[AutoModuleKwargs]):
+    def __init__(
+        self,
+        weight_quant: Optional[_InjectorType] = None,
+        act_quant: Optional[_InjectorType] = None,
+        bias_quant: Optional[_InjectorType] = None,
+        in_quant: Optional[_InjectorType] = None,
+        out_quant: Optional[_InjectorType] = None,
+        load_float_weights_into_model: bool = True,
+        remove_dropout_layers: bool = True,
+        fold_batch_norm_layers: bool = True,
+        allow_quant_tensor_slicing: bool = False,
+        enable_brevitas_jit: bool = False,
+        calibrate: bool = False,
+        correct_biases: bool = False,
+        correct_norms: bool = False,
+        skip_modules: Optional[List[Union[type[nn.Module], str]]] = None,
+        limit_calibration_batches: Optional[int] = None,
+        **kwargs: Unpack[AutoModuleKwargs],
+    ):
         super().__init__(**kwargs)
 
         if enable_brevitas_jit:
@@ -79,19 +88,25 @@ class BrevitasMixin:
         self.limit_calibration_batches = limit_calibration_batches
 
         if limit_calibration_batches is not None:
-            assert self.calibrate or self.correct_biases or self.correct_norms, "Calibration or bias correction or norm correction must be enabled to limit calibration batches."
+            assert self.calibrate or self.correct_biases or self.correct_norms, (
+                "Calibration or bias correction or norm correction must be enabled to limit calibration batches."
+            )
 
         if self.calibrate or self.correct_biases or self.correct_norms:
-            assert self.limit_calibration_batches is not None, "Limit calibration batches must be set if calibration or bias correction or norm correction is enabled."
+            assert self.limit_calibration_batches is not None, (
+                "Limit calibration batches must be set if calibration or bias correction or norm correction is enabled."
+            )
             assert self.limit_calibration_batches > 0, "Limit calibration batches must be greater than 0."
 
         self.prepare_model()
 
     def prepare_model(self):
-        assert self.net != None, "Default model to quantize ('self.net') is not set."
+        assert self.net is not None, "Default model to quantize ('self.net') is not set."
 
-        if self.skip_modules != None:
-            skip_modules = [_import_module(module) if isinstance(module, str) else module for module in self.skip_modules]
+        if self.skip_modules is not None:
+            skip_modules = [
+                _import_module(module) if isinstance(module, str) else module for module in self.skip_modules
+            ]
         else:
             skip_modules = None
 
@@ -105,7 +120,7 @@ class BrevitasMixin:
             load_float_weights_into_model=self.load_float_weights_into_model,
             remove_dropout_layers=self.remove_dropout_layers,
             fold_batch_norm_layers=self.fold_batch_norm_layers,
-            skip_modules=skip_modules
+            skip_modules=skip_modules,
         )
 
         self.calibrate_context = calibration_mode(self.net) if self.calibrate else nullcontext()
@@ -132,7 +147,7 @@ class BrevitasMixin:
     def on_train_batch_start(self, batch: Any, batch_idx: int) -> Optional[int]:
         out = super().on_train_batch_start(batch, batch_idx)
 
-        if self.current_context is None and self.limit_calibration_batches != None:
+        if self.current_context is None and self.limit_calibration_batches is not None:
             context_name = _get_first_context(self.contexts_to_enter, self.contexts_exited)
 
             if context_name is not None:
@@ -147,7 +162,7 @@ class BrevitasMixin:
                 print(f"Starting {context_name[:-8]} operation...")
 
         return out
-    
+
     def exit_quant_context_if_exists(self):
         if self.current_context is not None:
             self.current_context.__exit__(None, None, None)
@@ -173,7 +188,7 @@ class BrevitasMixin:
 
         if self.current_context is None:
             return output
-        
+
         return None
 
 

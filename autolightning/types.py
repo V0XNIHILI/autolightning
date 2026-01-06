@@ -1,4 +1,14 @@
-from typing import Dict, Optional, Union, Callable, Any, Literal, Iterable, TypedDict, List
+from typing import (
+    Dict,
+    Optional,
+    Union,
+    Callable,
+    Any,
+    Literal,
+    Iterable,
+    TypedDict,
+    List,
+)
 
 try:
     from typing import Unpack  # Python 3.11+
@@ -11,20 +21,30 @@ from torch.optim.optimizer import Optimizer
 from torchmetrics.metric import Metric
 from lightning.pytorch.cli import OptimizerCallable, LRSchedulerCallable
 
-
 MetricType = Dict[str, Union[Metric, Callable[..., Any]]]
-OptimizerType = Union[Optimizer, OptimizerCallable, Iterable[Union[Optimizer, OptimizerCallable]], Dict[str, OptimizerCallable]]
+OptimizerType = Union[
+    Optimizer,
+    OptimizerCallable,
+    Iterable[Union[Optimizer, OptimizerCallable]],
+    Dict[str, OptimizerCallable],
+]
 LrSchedulerType = Union[LRSchedulerCallable, Dict]
 IterableOfModules = Iterable[nn.Module]
+
+try:
+    from transformers.models.auto.auto_factory import _BaseAutoModelClass as BAMC
+except ImportError:
+    BAMC = nn.Module  # fallback type
+NetType = Union[nn.Module, BAMC]
 
 CallableOrModule = Union[Callable, nn.Module]
 TransformValue = Union[List[CallableOrModule], CallableOrModule]
 
-Phase = Literal["train", "val", "test"]
+Phase = Literal["train", "val", "test", "pred"]
 
 
 class AutoModuleKwargs(TypedDict, total=False):
-    net: Optional[nn.Module]
+    net: Optional[NetType]
     criterion: Optional[nn.Module]
     optimizer: Optional[OptimizerType]
     lr_scheduler: Optional[LrSchedulerType]
@@ -36,7 +56,7 @@ class AutoModuleKwargs(TypedDict, total=False):
 
 
 class AutoModuleKwargsNoCriterion(TypedDict, total=False):
-    net: Optional[nn.Module]
+    net: Optional[NetType]
     optimizer: Optional[OptimizerType]
     lr_scheduler: Optional[LrSchedulerType]
     metrics: Optional[MetricType]
@@ -88,3 +108,36 @@ class AutoDataModuleKwargsNoDatasetPrepareSplit(TypedDict, total=False):
     pre_load: Union[Dict[str, bool], bool]
     cross_val: Optional[Dict[str, int]]
     seed: Optional[int]
+
+
+class ClassifierKwargs(TypedDict, total=False):
+    top_k: int
+    net: Optional[NetType]
+    criterion: Optional[nn.Module]
+    optimizer: Optional[OptimizerType]
+    lr_scheduler: Optional[LrSchedulerType]
+    metrics: Optional[MetricType]
+    loss_log_key: Optional[str]
+    log_metrics: bool
+    exclude_no_grad: bool
+    disable_prog_bar: bool
+
+
+__all__ = [
+    "Unpack",
+    "MetricType",
+    "OptimizerType",
+    "LrSchedulerType",
+    "IterableOfModules",
+    "NetType",
+    "CallableOrModule",
+    "TransformValue",
+    "Phase",
+    "AutoModuleKwargs",
+    "AutoModuleKwargsNoCriterion",
+    "AutoModuleKwargsNoNet",
+    "AutoModuleKwargsNoNetCriterion",
+    "AutoDataModuleKwargs",
+    "AutoDataModuleKwargsNoDatasetPrepareSplit",
+    "ClassifierKwargs",
+]

@@ -13,11 +13,11 @@ Current benchmarks show an average **15% reduction in lines of code** compared t
 - [**Custom CLI**](#custom-cli): `autolightning`'s CLI application avoids having to create separate `LightningCLI`s for each new project
 - [**Config-driven model training**](#config-driven-model-training): Using the CLI, train models with minimal code using YAML or Python config files, which will automatically be logged as hyperparameters to your selected logger
 - [**Comprehensive transform pipelines**](#transform-pipeline): Easily define complex transform pipelines for datasets
-- [**Flexible optimizer and scheduler configuration**](#optimizer-and-scheduler-configuration): Define optimizers and schedulers in the configuration file
+- [**Flexible optimizer and scheduler configuration**](#flexible-optimizer-and-scheduler-configuration): Define optimizers and schedulers in the configuration file
 - [**Additional (torch) runtime flags**](#additional-runtime-flags): Enable PyTorch performance optimizations from the command line
 - [**Built-in dataset splitting**](#built-in-dataset-splitting): Random split and cross-validation support from the command line or with a configuration file
 - [**Hyperparameter optimization & model watching**](#hyperparameter-sweeps): Use Weights & Biases, Ray Tune, or Optuna for hyperparameter sweeps. Track model gradient results with Weights & Biases from the command line
-- [**Standardized training methods**](#standardized-training-methods): Pre-made modules for supervised learning, self-supervised learning, knowledge distillation, and more
+- [**Built-in training methods**](#built-in-training-methods): Pre-made modules for supervised learning, self-supervised learning, knowledge distillation, and more
 - [**Config-file utilities**](#config-file-utilities): Load pre-trained models, compile models, or freeze model parameters from a configuration file
 
 ## Installation
@@ -36,6 +36,8 @@ pip install -e .
 ```
 
 ## Quick Start: Supervised Learning on MNIST
+
+There are two keys ways to work with `autolightning`: using Python scripts or using the CLI, both of which are detailed below.
 
 ### Using Python Code
 
@@ -71,7 +73,7 @@ trainer = Trainer(max_epochs=10)
 trainer.fit(model, data)
 ```
 
-### Using Configuration (YAML)
+### Using the CLI with YAML Configuration Files
 
 Create a `config.yaml`:
 
@@ -185,27 +187,28 @@ Example:
 data = AutoDataModule(
     dataset=CIFAR10("data", train=True, download=True),
     transforms={
-        "pre_load": SimpleTransform(1),  # Applied before loading to memory
+        "pre_load": SimpleTransform(1),  # Applied before dataset into DRAM (if enabled, see below)
         "pre": [Transform1(), Transform2()],  # Applied before phase transform
         "train": TrainTransform(),  # Only applied to training data
         "val": ValTransform(),  # Only applied to validation data
         "post": PostTransform()  # Applied after phase transform
     },
     target_transforms={
+        # Same application order as above
         "pre_load": LabelTransform(),
         "train": LabelTransform(),
         "val": LabelTransform(),
         "post": LabelTransform()
     },
     batch_transforms={
-        "before": BatchTransformBeforeGPU(),
-        "after": BatchTransformAfterGPU()
+        "before": BatchTransformBeforeGPU(), # Applied before batch is moved to the GPU
+        "after": BatchTransformAfterGPU() # Applied after the batch is moved to the GPU
     },
-    pre_load=True  # Enable pre-loading
+    pre_load=True  # Enable pre-loading of the dataset into DRAM
 )
 ```
 
-### Optimizer and Scheduler Configuration
+### Flexible Optimizer and Scheduler Configuration
 
 By default when using `LightningCLI`, you can specify the optimizer and scheduler in the configuration file in the following way:
 
@@ -420,25 +423,56 @@ done
 
 #### Using Weights & Biases
 
-```python
-sweep_configuration = {
-    'method': 'grid',
-    'name': 'Example Sweep',
-    'command': ['python', '${program}', '--config', yaml_conf, '${args_no_hyphens}'],
-    'program': "autolightning",
-    'parameters': {
-        'model.init_args.learning_rate': {
-            'values': [0.001, 0.01, 0.1]
-        }
-    },
-    'metric': {
-        'name': 'val_loss',
-        'goal': 'minimize'
-    }
-}
+Create a WandB sweep config, find an example below:
+
+```yaml
+name: omniglot_proto_net_sweep
+method: bayes
+metric:
+  name: val/loss
+  goal: minimize
+early_terminate:
+  type: hyperband
+  min_iter: 3
+  eta: 3
+  strict: true
+parameters:
+  optimizer:
+    parameters:
+      init_args:
+        parameters:
+          lr: {'max': 0.1, 'min': 1e-5, 'distribution': 'log_uniform_values'}
+          weight_decay: {'max': 5e-4, 'min': 1e-5, 'distribution': 'log_uniform_values'}
+command:
+- autolightning
+- fit
+- -c
+- ./proto_net.yaml
+- -c
+- ./few_shot_data.yaml
+- -c
+- ../machine_specific/lug.py
+- -c
+- ../machine_specific/project_settings.yaml
+- -c
+- //wandb_sweep
 ```
 
-Use the `AutoWandbLogger` in your configuration to track results.
+In order for WandB sweeps to work plug-and-play with AutoLightning, make sure to include the `-c //wandb_sweep` argument in the arguments list for the command.
+
+Then, to initialize the sweep, run:
+
+```bash
+wandb sweep <name of sweep config file>.yaml -p <project name>
+```
+
+This command will print a message with the sweep id. Finally, to start the sweep experiments, run:
+
+```bash
+wandb agent <wandb username>/<project name>/<sweep id>
+```
+
+Make sure to use the `AutoWandbLogger` to track results.
 
 #### Using Ray Tune or Optuna
 
@@ -465,15 +499,11 @@ search_space = {
 analysis = tune.run(tune_function, config=search_space)
 ```
 
-### Standardized Training Methods
+### Built-in Training Methods
 
 #### Supervised Learning
 - [**`Supervised`**](./autolightning/lm/supervised.py): General supervised learning
 - [**`Classifier`**](./autolightning/lm/classifier.py): Classification tasks
-
-#### Self-supervised Learning
-- [**`Triplet`**](./autolightning/lm/self_supervised.py): Siamese networks for similarity learning
-- [**`Triplet`**](./autolightning/lm/self_supervised.py): Triplet networks for ranking tasks
 
 #### Knowledge Distillation
 - [**`Distilled`**](./autolightning/lm/distilled.py): Knowledge distillation with optional student head and regressor
@@ -498,6 +528,8 @@ analysis = tune.run(tune_function, config=search_space)
 
 ### Config-file utilities
 
+Since `jsonargparse` does not support various constructs that are often used for deep learning experiments, `autolightning` includes special type-checked utility functions for these operations.
+
 #### Loading Pre-trained Models
 
 ```yaml
@@ -518,9 +550,7 @@ model:
 #### Compiling Models
 
 ```yaml
-model:
-  class_path: autolightning.lm.Classifier
-  init_args:
+...
     net:
       class_path: autolightning.compile
       init_args:
@@ -535,9 +565,7 @@ model:
 #### Freezing Model Parameters
 
 ```yaml
-model:
-  class_path: autolightning.lm.Classifier
-  init_args:
+...
     net:
       class_path: autolightning.disable_grad
       init_args:
@@ -546,6 +574,43 @@ model:
           init_args:
               in_channels: 784
               hidden_channels: [100, 10]
+```
+
+#### `torch.nn.Sequential`:
+
+```yaml
+...
+    net:
+      class_path: autolightning.sequential
+      init_args:
+        modules:
+          - class_path: nn.Linear
+            init_args:
+                in_features: 784
+                out_features: 100
+          - class_path: nn.Linear
+            init_args:
+                in_features: 100
+                out_features: 10
+```
+
+#### Huggingface's `AutoModule.from_config`:
+
+```yaml
+...
+    net:
+      class_path: autolightning.from_transformers_config
+      init_args:
+        auto_model: AutoModelForCausalLM
+        config:
+          class_path: fla.models.GLAConfig
+          init_args:
+            hidden_size: 256
+            num_hidden_Layers: 4
+            num_heads: 2
+            expand_v: 1
+            max_position_embeddings: 1024
+            vocab_size: 32
 ```
 
 ## Best Practices
@@ -589,7 +654,7 @@ autolightning adds several hooks to the standard Lightning model:
 
 - **`parameters_for_optimizer(self, recurse: bool = True)`**: Control which parameters are used for optimization
 - **`register_optimizer(self, module: nn.Module, optimizer, lr_scheduler)`**: Register optimizers and schedulers
-- **`register_metric(self, name: str, metric)`**: Register evaluation metrics
+- **`configure_metrics(self)`**: Return a dict of metrics
 - **`shared_step(self, phase: Phase, *args, **kwargs)`**: Core step function for all phases
 - **`shared_logged_step(self, phase: Phase, *args: Any, **kwargs: Any)`**: Logging-aware step function
 
@@ -635,9 +700,9 @@ from autolightning.main import auto_main
 with open("config.yaml", "r") as f:
     config = yaml.safe_load(f)
 
+# Run the 'fit' procedure
 auto_main(
-  # Load config from one or more files
-  config=config, # Can be a list of dictionaries
+  config=config, # Can also be a list of dictionaries
   subcommand="fit"
 )
 
@@ -652,9 +717,10 @@ from autolightning.main import auto_main
 with open("config.yaml", "r") as f:
     config = yaml.safe_load(f)
 
-# Load config from one or more files
+# Instantiate the trainer, model and data module
+# but do not start training or testing
 trainer, model, datamodule = auto_main(
-    config=config,
+    config=config, # Can also be a list of dictionaries
     run=False 
 )
 ```

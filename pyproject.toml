@@ -1,6 +1,6 @@
 [project]
 name = "autolightning"
-version = "0.1.1"
+version = "0.1.2"
 authors = [
   { name = "Douwe den Blanken" }
 ]
@@ -35,6 +35,9 @@ build-backend = "hatchling.build"
 [tool.hatch.metadata]
 # To allow installation of the package from the git repository
 allow-direct-references = true
+
+[tool.ruff]
+line-length = 120
 
 [project.urls]
 "Homepage" = "https://github.com/V0XNIHILI/autolightning"
