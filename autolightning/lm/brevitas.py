@@ -1,3 +1,4 @@
+import re
 from typing import Optional, List, Any, Dict, Union
 from contextlib import nullcontext
 
@@ -21,9 +22,21 @@ from brevitas_utils import (
 from brevitas_utils.creation import create_quantizer
 from brevitas_utils.bias_correction import add_zero_bias_to_linear
 
-from . import Supervised, Classifier, Prototypical
+from . import Supervised, Classifier, Prototypical, ICLClassifier
 from ..utils import _import_module
 from ..types import AutoModuleKwargs, Unpack
+
+
+_BRACKET_RE = re.compile(r"^[^\[\]]*\[(\d+)\][^\[\]]*$")
+
+def extract_bracket_index(name: str, raise_on_error: bool = True) -> Optional[int]:
+    match = _BRACKET_RE.match(name)
+    if match is None:
+        if "[" in name or "]" in name:
+            if raise_on_error:
+                raise ValueError(f"Invalid bracket usage in '{name}'")
+        return None
+    return int(match.group(1))
 
 
 def _get_first_context(contexts_to_enter: List[str], contexts_exited: List[str]):
@@ -61,6 +74,7 @@ class BrevitasMixin:
         correct_norms: bool = False,
         skip_modules: Optional[List[Union[type[nn.Module], str]]] = None,
         limit_calibration_batches: Optional[int] = None,
+        net_attrs_to_quant: Optional[List[str]] = None,
         **kwargs: Unpack[AutoModuleKwargs],
     ):
         super().__init__(**kwargs)
@@ -98,20 +112,15 @@ class BrevitasMixin:
             )
             assert self.limit_calibration_batches > 0, "Limit calibration batches must be greater than 0."
 
-        self.prepare_model()
 
-    def prepare_model(self):
-        assert self.net is not None, "Default model to quantize ('self.net') is not set."
+        if net_attrs_to_quant is None:
+            net_attrs_to_quant = ['net']
 
-        if self.skip_modules is not None:
-            skip_modules = [
-                _import_module(module) if isinstance(module, str) else module for module in self.skip_modules
-            ]
-        else:
-            skip_modules = None
+        self.prepare_model(net_attrs_to_quant)
 
-        self.net = create_qat_ready_model(
-            self.net,
+    def quantize_model(self, model: nn.Module, skip_modules: Optional[List[type[nn.Module]]] = None):
+        model = create_qat_ready_model(
+            model,
             weight_quant=self.weight_quant,
             act_quant=self.act_quant,
             bias_quant=self.bias_quant,
@@ -123,9 +132,39 @@ class BrevitasMixin:
             skip_modules=skip_modules,
         )
 
-        self.calibrate_context = calibration_mode(self.net) if self.calibrate else nullcontext()
-        self.correct_biases_context = bias_correction_mode(self.net) if self.correct_biases else nullcontext()
-        self.correct_norms_context = norm_correction_mode(self.net) if self.correct_norms else nullcontext()
+        if self.correct_biases:
+            model = add_zero_bias_to_linear(model)
+
+        return model
+
+    def prepare_model(self, net_attrs_to_quant: List[str]):
+        if self.skip_modules is not None:
+            skip_modules = [
+                _import_module(module) if isinstance(module, str) else module for module in self.skip_modules
+            ]
+        else:
+            skip_modules = None
+
+        self.calibrate_context = []
+        self.correct_biases_context = []
+        self.correct_norms_context = []
+
+        for net_attr in net_attrs_to_quant:
+            net_attr_sub_index = extract_bracket_index(net_attr)
+
+            if net_attr_sub_index is not None:
+                base_net = getattr(self, net_attr.split('[')[0])
+                sub_net = base_net[net_attr_sub_index]
+                quant_net = self.quantize_model(sub_net, skip_modules=skip_modules)
+                base_net[net_attr_sub_index] = quant_net
+            else:
+                net = getattr(self, net_attr)
+                quant_net = self.quantize_model(net, skip_modules=skip_modules)
+                setattr(self, net_attr, quant_net)
+
+            self.calibrate_context.append(calibration_mode(quant_net) if self.calibrate else nullcontext())
+            self.correct_biases_context.append(bias_correction_mode(quant_net) if self.correct_biases else nullcontext())
+            self.correct_norms_context.append(norm_correction_mode(quant_net) if self.correct_norms else nullcontext())
 
         self.contexts_to_enter = []
 
@@ -134,7 +173,6 @@ class BrevitasMixin:
 
         if self.correct_biases:
             self.contexts_to_enter.append("correct_biases_context")
-            self.net = add_zero_bias_to_linear(self.net)
 
         if self.correct_norms:
             self.contexts_to_enter.append("correct_norms_context")
@@ -147,6 +185,10 @@ class BrevitasMixin:
     def on_train_batch_start(self, batch: Any, batch_idx: int) -> Optional[int]:
         out = super().on_train_batch_start(batch, batch_idx)
 
+        # In case a quantized checkpoint is reloaded, we do not want to start the calibration again
+        if self.limit_calibration_batches is not None and batch_idx + 1 >= len(self.contexts_to_enter) * self.limit_calibration_batches:
+            return out
+
         if self.current_context is None and self.limit_calibration_batches is not None:
             context_name = _get_first_context(self.contexts_to_enter, self.contexts_exited)
 
@@ -156,7 +198,8 @@ class BrevitasMixin:
                     self.no_grad_context.__enter__()
 
                 context = getattr(self, context_name)
-                context.__enter__()
+                for ctx in context:
+                    ctx.__enter__()
                 self.current_context = context
 
                 print(f"Starting {context_name[:-8]} operation...")
@@ -165,7 +208,8 @@ class BrevitasMixin:
 
     def exit_quant_context_if_exists(self):
         if self.current_context is not None:
-            self.current_context.__exit__(None, None, None)
+            for ctx in self.current_context:
+                ctx.__exit__(None, None, None)
             self.current_context = None
 
             current_context_name = _get_first_context(self.contexts_to_enter, self.contexts_exited)
@@ -202,3 +246,15 @@ class BrevitasClassifier(BrevitasMixin, Classifier):
 
 class BrevitasPrototypical(BrevitasMixin, Prototypical):
     pass
+
+
+class BrevitasICLClassifier(BrevitasMixin, ICLClassifier):
+    def __init__(self, **kwargs):
+        if kwargs.get('net_attrs_to_quant', None) is None:
+            kwargs['net_attrs_to_quant'] = ['net', 'sample_embedder']
+
+            if kwargs.get('query_sample_embedder', None) is not None:
+                kwargs['net_attrs_to_quant'].append('query_sample_embedder')
+
+        super().__init__(**kwargs)
+
