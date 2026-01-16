@@ -204,6 +204,10 @@ data = AutoDataModule(
         "before": BatchTransformBeforeGPU(), # Applied before batch is moved to the GPU
         "after": BatchTransformAfterGPU() # Applied after the batch is moved to the GPU
     },
+    target_batch_transforms={
+        "before": TBatchTransformBeforeGPU(), # Applied before batch is moved to the GPU
+        "after": TBatchTransformAfterGPU() # Applied after the batch is moved to the GPU
+    },
     pre_load=True  # Enable pre-loading of the dataset into DRAM
 )
 ```
@@ -226,7 +230,7 @@ lr_scheduler:
     eta_min: 0.0
 ```
 
-However, this is not very flexible for more advanced use cases. Hence, in `autolightning`, you can specify the optimizer and scheduler as arguments to the model class:
+However, this is not very flexible for more advanced use cases. Hence, in `autolightning`, you can also specify the optimizer and scheduler as arguments to the model class:
 
 ```yaml
 data: ...
@@ -343,6 +347,7 @@ torch:
       profile: false
       emit_nvtx: false
   set_float32_matmul_precision: highest
+  set_num_threads: -1
   backends:
     cuda:
       matmul:
