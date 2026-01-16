@@ -8,6 +8,22 @@ from autolightning.lm.classifier import ClassifierMixin
 from autolightning.types import NetType, Phase, AutoModuleKwargs, Unpack
 
 
+def embed(X: torch.Tensor, embedder: nn.Module, batch: int, combine_batch_and_samples: bool = False):
+    if embedder is None:
+        return X
+
+    if combine_batch_and_samples:
+        # Combine first and second dimension (X: (batch, ways*shots, ...))
+        X = X.view(-1, *X.size()[2:]) # (batch * n_train/test_samples, ...)
+
+    X = embedder(X) # (batch * n_train/test_samples, ...)
+
+    if combine_batch_and_samples:
+        X = X.view(batch, -1, *X.size()[1:]) # (batch, n_train/test_samples, ...)
+
+    return X
+
+
 def icl_forward(
     head_or_net: nn.Module,
     X_train,
@@ -20,24 +36,11 @@ def icl_forward(
 ):
     batch = X_train.size(0)
 
-    if sample_embedder is not None or query_sample_embedder is not None:
-        def embed(X, embedder):
-            if embedder is None:
-                return X
-
-            if combine_batch_and_samples:
-                # Combine first and second dimension (X: (batch, ways*shots, ...))
-                X = X.view(-1, *X.size()[2:]) # (batch * n_train/test_samples, ...)
-
-            X = embedder(X) # (batch * n_train/test_samples, ...)
-
-            if combine_batch_and_samples:
-                X = X.view(batch, -1, *X.size()[1:]) # (batch, n_train/test_samples, ...)
-
-            return X
-
-        X_train = embed(X_train, sample_embedder)
-        X_test = embed(X_test, query_sample_embedder)
+    if sample_embedder is not None:
+        X_train = embed(X_train, sample_embedder, batch, combine_batch_and_samples)
+    
+    if query_sample_embedder is not None:
+        X_test = embed(X_test, query_sample_embedder, batch, combine_batch_and_samples)
 
     X = None
 
