@@ -74,7 +74,8 @@ class BrevitasMixin:
         correct_norms: bool = False,
         skip_modules: Optional[List[Union[type[nn.Module], str]]] = None,
         limit_calibration_batches: Optional[int] = None,
-        net_attrs_to_quant: Optional[List[str]] = None,
+        subnet_quant_config: Optional[Union[List[str], Dict[str, Any]]] = None,
+        shared_act_quant_mapping: Optional[Dict[str, List[str]]] = None,
         **kwargs: Unpack[AutoModuleKwargs],
     ):
         super().__init__(**kwargs)
@@ -99,7 +100,11 @@ class BrevitasMixin:
         self.correct_norms = correct_norms
         self.skip_modules = skip_modules
 
+        self.shared_act_quant_mapping = shared_act_quant_mapping
+
         self.limit_calibration_batches = limit_calibration_batches
+
+        self.no_grad_context = torch.no_grad()
 
         if limit_calibration_batches is not None:
             assert self.calibrate or self.correct_biases or self.correct_norms, (
@@ -112,24 +117,47 @@ class BrevitasMixin:
             )
             assert self.limit_calibration_batches > 0, "Limit calibration batches must be greater than 0."
 
+        if subnet_quant_config is None:
+            self.subnet_quant_config = {'net': {}}
+        elif isinstance(subnet_quant_config, list):
+            self.subnet_quant_config = {net_attr: {} for net_attr in subnet_quant_config}
+        else:
+            self.subnet_quant_config = subnet_quant_config
 
-        if net_attrs_to_quant is None:
-            net_attrs_to_quant = ['net']
+        self.prepare_model()
 
-        self.prepare_model(net_attrs_to_quant)
+    def _quantize_model(self, model: nn.Module, skip_modules: Optional[List[type[nn.Module]]] = None, override_config: Optional[Dict[str, Any]] = None):
+        allowed_keys = {
+            "weight_quant",
+            "act_quant",
+            "bias_quant",
+            "in_quant",
+            "out_quant",
+            "load_float_weights_into_model",
+            "remove_dropout_layers",
+            "fold_batch_norm_layers"
+        }
 
-    def quantize_model(self, model: nn.Module, skip_modules: Optional[List[type[nn.Module]]] = None):
+        if override_config is None:
+            override_config = {}
+
+        keys = set(override_config.keys())
+
+        assert keys.issubset(allowed_keys), (
+            f"Invalid keys found: {keys - allowed_keys}. Allowed keys are: {allowed_keys}."
+        )
+
         model = create_qat_ready_model(
             model,
-            weight_quant=self.weight_quant,
-            act_quant=self.act_quant,
-            bias_quant=self.bias_quant,
-            in_quant=self.in_quant,
-            out_quant=self.out_quant,
-            load_float_weights_into_model=self.load_float_weights_into_model,
-            remove_dropout_layers=self.remove_dropout_layers,
-            fold_batch_norm_layers=self.fold_batch_norm_layers,
-            skip_modules=skip_modules,
+            weight_quant=override_config.get("weight_quant", self.weight_quant),
+            act_quant=override_config.get("act_quant", self.act_quant),
+            bias_quant=override_config.get("bias_quant", self.bias_quant),
+            in_quant=override_config.get("in_quant", self.in_quant),
+            out_quant=override_config.get("out_quant", self.out_quant),
+            load_float_weights_into_model=override_config.get("load_float_weights_into_model", self.load_float_weights_into_model),
+            remove_dropout_layers=override_config.get("remove_dropout_layers", self.remove_dropout_layers),
+            fold_batch_norm_layers=override_config.get("fold_batch_norm_layers", self.fold_batch_norm_layers),
+            skip_modules=skip_modules
         )
 
         if self.correct_biases:
@@ -137,7 +165,7 @@ class BrevitasMixin:
 
         return model
 
-    def prepare_model(self, net_attrs_to_quant: List[str]):
+    def prepare_model(self):
         if self.skip_modules is not None:
             skip_modules = [
                 _import_module(module) if isinstance(module, str) else module for module in self.skip_modules
@@ -149,18 +177,10 @@ class BrevitasMixin:
         self.correct_biases_context = []
         self.correct_norms_context = []
 
-        for net_attr in net_attrs_to_quant:
-            net_attr_sub_index = extract_bracket_index(net_attr)
-
-            if net_attr_sub_index is not None:
-                base_net = getattr(self, net_attr.split('[')[0])
-                sub_net = base_net[net_attr_sub_index]
-                quant_net = self.quantize_model(sub_net, skip_modules=skip_modules)
-                base_net[net_attr_sub_index] = quant_net
-            else:
-                net = getattr(self, net_attr)
-                quant_net = self.quantize_model(net, skip_modules=skip_modules)
-                setattr(self, net_attr, quant_net)
+        for subnet_name, subnet_config in self.subnet_quant_config.items():
+            net = self.get_submodule(subnet_name)
+            quant_net = self._quantize_model(net, skip_modules=skip_modules, override_config=subnet_config)
+            self.set_submodule(subnet_name, quant_net)
 
             self.calibrate_context.append(calibration_mode(quant_net) if self.calibrate else nullcontext())
             self.correct_biases_context.append(bias_correction_mode(quant_net) if self.correct_biases else nullcontext())
@@ -180,7 +200,12 @@ class BrevitasMixin:
         self.contexts_exited = []
         self.current_context = None
 
-        self.no_grad_context = torch.no_grad()
+        if self.shared_act_quant_mapping is not None:
+            for shared_quantizer_name, module_names in self.shared_act_quant_mapping.items():
+                shared_quantizer = self.get_submodule(shared_quantizer_name)
+
+                for module_name in module_names:
+                    self.set_submodule(module_name, shared_quantizer)
 
     def on_train_batch_start(self, batch: Any, batch_idx: int) -> Optional[int]:
         out = super().on_train_batch_start(batch, batch_idx)
@@ -250,11 +275,11 @@ class BrevitasPrototypical(BrevitasMixin, Prototypical):
 
 class BrevitasICLClassifier(BrevitasMixin, ICLClassifier):
     def __init__(self, **kwargs):
-        if kwargs.get('net_attrs_to_quant', None) is None:
-            kwargs['net_attrs_to_quant'] = ['net', 'sample_embedder']
+        if kwargs.get('subnet_quant_config', None) is None:
+            kwargs['subnet_quant_config'] = ['net', 'sample_embedder']
 
             if kwargs.get('query_sample_embedder', None) is not None:
-                kwargs['net_attrs_to_quant'].append('query_sample_embedder')
+                kwargs['subnet_quant_config'].append('query_sample_embedder')
 
         super().__init__(**kwargs)
 
