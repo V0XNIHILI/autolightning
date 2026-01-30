@@ -7,8 +7,7 @@ from torch.nn.parameter import Parameter
 
 import lightning as L
 from pytorch_lightning.utilities.types import OptimizerLRScheduler
-
-from lightning.pytorch.cli import OptimizerCallable
+from torchmetrics.metric import Metric
 
 from .types import MetricType, OptimizerType, LrSchedulerType, NetType, Phase
 
@@ -21,7 +20,6 @@ KEYS_TO_IGNORE = [
     "metrics",
     "optimizer",
     "compiler",
-    "metrics",
     "loss_log_key",
     "log_metrics",
 ]
@@ -97,6 +95,7 @@ class AutoModule(L.LightningModule):
         self.register_optimizer(self, optimizer, lr_scheduler)
 
         self.metrics = self.configure_metrics() | self.metrics
+        self.register_torchmetrics()
 
         self.loss_log_key = loss_log_key
         self.log_metrics = log_metrics
@@ -120,7 +119,7 @@ class AutoModule(L.LightningModule):
     def register_optimizer(
         self,
         module: nn.Module,
-        optimizer: Optional[OptimizerCallable] = None,
+        optimizer: Optional[OptimizerType] = None,
         lr_scheduler: Optional[LrSchedulerType] = None,
     ):
         if optimizer is not None:
@@ -241,6 +240,19 @@ class AutoModule(L.LightningModule):
 
     def configure_metrics(self) -> MetricType:
         return {}
+    
+    def register_torchmetrics(self):
+        # It is necessary to have all torch metrics instances registered as sub NN modules
+        # in order for the .update calls on the metrics to work without errors
+
+        torch_metrics = {}
+
+        for name, metric in self.metrics.items():
+            if isinstance(metric, Metric):
+                torch_metrics[name] = metric
+
+        if torch_metrics != {}:
+            self.torchmetrics = nn.ModuleDict(torch_metrics)
 
     def should_enable_prog_bar(self, phase: Phase):
         if self.disable_prog_bar:
@@ -281,7 +293,19 @@ class AutoModule(L.LightningModule):
             # TODO: maybe this functionality should be removed???
             for name, metric in self.metrics.items():
                 metric_func, metric_specific_log_kwargs = _resolve_metric(metric, default_log_kwargs)
-                self.log(f"{phase}/{name}", metric_func(*step_out), **metric_specific_log_kwargs)
+
+                if isinstance(metric_func, Metric):
+                    metric_func.to(device=step_out[0].device)
+
+                    if phase != "train":
+                        metric_func.update(*step_out)
+                        metric_val = metric_func
+                    else:
+                        metric_val = metric_func(*step_out)
+                else:
+                    metric_val = metric_func(*step_out)
+
+                self.log(f"{phase}/{name}", metric_val, **metric_specific_log_kwargs)
         elif isinstance(step_out, dict):
             loss_computed = "loss" in step_out
             criterion_args_provided = "criterion_args" in step_out
@@ -301,7 +325,12 @@ class AutoModule(L.LightningModule):
             if "metrics_args" in step_out:
                 for name, args in step_out["metrics_args"].items():
                     metric_func, metric_specific_log_kwargs = _resolve_metric(self.metrics[name], curr_step_log_kwargs)
+
+                    if isinstance(metric_func, Metric):
+                        metric_func.to(device=step_out[0].device)
+
                     metric_val = _call_with_flexible_args(metric_func, args)
+
                     metrics_to_log.append((f"{phase}/{name}", (metric_val, metric_specific_log_kwargs)))
 
             if "computed_metrics" in step_out:
