@@ -1,6 +1,6 @@
 from typing import Literal
 
-from typing import Tuple, List, Callable, Optional
+from typing import Tuple, List, Optional
 
 import torch
 import torch.nn as nn
@@ -25,8 +25,6 @@ MetricType = Literal[
     "manhattan",
     "cosine",
 ]
-
-from torchvision.transforms.v2 import Transform
 
 
 UNKNOWN_METRIC_MESSAGE = "Must be one of [euclidean, euclidean-squared, manhattan, dot, cosine, logistic-regression]"
