@@ -244,7 +244,7 @@ model:
   lr_scheduler:
     class_path: autolightning.sched
     dict_kwargs:
-      scheduler_path: torch.optim.lr_scheduler.CosineAnnealingLR
+      lr_scheduler_path: torch.optim.lr_scheduler.CosineAnnealingLR
       T_max: 100
       eta_min: 0.0
 ```
