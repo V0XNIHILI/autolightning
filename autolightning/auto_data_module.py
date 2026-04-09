@@ -444,7 +444,7 @@ class AutoDataModule(L.LightningDataModule):
         else:
             return Transformed(dataset, transform, target_transform)
 
-    def get_dataloader_kwargs(self, phase: Phase):
+    def get_dataloader_kwargs(self, phase: Phase, dataset: Union[Dataset, IterableDataset]) -> dict:
         # If the dataloader configuration is specified per phase...
         if any(key in self.dataloaders for key in ALLOWED_DATASET_KEYS):
             unsupported_keys = set(self.dataloaders.keys()) - set(ALLOWED_DATASET_KEYS)
@@ -461,7 +461,7 @@ class AutoDataModule(L.LightningDataModule):
 
     def get_dataloader(self, phase: Phase):
         dataset = self.get_transformed_dataset(phase)
-        kwargs = self.get_dataloader_kwargs(phase)
+        kwargs = self.get_dataloader_kwargs(phase, dataset)
         return DataLoader(dataset, **kwargs)
 
     def train_dataloader(self):
