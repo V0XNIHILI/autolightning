@@ -1,8 +1,10 @@
-from typing import Optional, Union, List
+from typing import Optional, Union, List, Tuple
 from pathlib import Path
 import yaml
 
-from autolightning import AutoModule, AutoCLI
+from lightning.pytorch.trainer import Trainer
+
+from autolightning import AutoModule, AutoCLI, AutoDataModule
 from autolightning.auto_cli import LoggerSaveConfigCallback
 from autolightning.utils import merge_dicts
 
@@ -42,7 +44,7 @@ def auto_main(
     config: Optional[Union[List[dict], dict, List[str], List[Path], str, Path]] = None,
     subcommand: Optional[str] = None,
     run: bool = True,
-):
+) -> Tuple[Trainer, AutoModule, AutoDataModule]:
     final_config = None
 
     if config is not None:
