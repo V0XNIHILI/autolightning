@@ -80,7 +80,7 @@ def _get_metric_val_and_log_kwargs(metric: Union[Metric, Callable[..., Any]], me
 
     if isinstance(metric_func, Metric):
         metric_func.to(device=metric_input[0].device)
-        _call_with_flexible_args(metric_func, metric_input)
+        _call_with_flexible_args(metric_func.update, metric_input)
         metric_val = metric_func   
     else:
         metric_val = _call_with_flexible_args(metric_func, metric_input)
