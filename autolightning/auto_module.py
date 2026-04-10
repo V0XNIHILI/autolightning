@@ -19,7 +19,6 @@ KEYS_TO_IGNORE = [
     "criterion",
     "metrics",
     "optimizer",
-    "compiler",
     "loss_log_key",
     "log_metrics",
 ]
