@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Any, Iterator, Union, Callable, Tuple
+from typing import Dict, List, Optional, Any, Iterator, Union, Callable, Tuple
 import warnings
 
 import torch.nn as nn
@@ -73,6 +73,20 @@ def _get_scheduler(scheduler: LrSchedulerType, optimizer: optim.Optimizer, shoul
     raise TypeError(
         f"Invalid scheduler type: {type(scheduler)}; expected either a scheduler, scheduler dict or a callable"
     )
+
+
+def _get_metric_val_and_log_kwargs(metric: Union[Metric, Callable[..., Any]], metric_input: Union[Tuple, List], default_log_kwargs: Dict[str, Any]):
+    metric_func, metric_specific_log_kwargs = _resolve_metric(metric, default_log_kwargs)
+
+    if isinstance(metric_func, Metric):
+        metric_func.to(device=metric_input[0].device)
+        _call_with_flexible_args(metric_func, metric_input)
+        metric_val = metric_func   
+    else:
+        metric_val = _call_with_flexible_args(metric_func, metric_input)
+
+    return metric_val, metric_specific_log_kwargs
+
 
 
 class AutoModule(L.LightningModule):
@@ -259,15 +273,7 @@ class AutoModule(L.LightningModule):
 
             # Compute all the provided metrics using the same step_out as input, and log them with their respective log kwargs (if provided)
             for name, metric in self.metrics.items():
-                metric_func, metric_specific_log_kwargs = _resolve_metric(metric, default_log_kwargs)
-
-                if isinstance(metric_func, Metric):
-                    metric_func.to(device=step_out[0].device)
-                    _call_with_flexible_args(metric_func, args)
-                    metric_val = metric_func   
-                else:
-                    metric_val = _call_with_flexible_args(metric_func, step_out)
-
+                metric_val, metric_specific_log_kwargs = _get_metric_val_and_log_kwargs(metric, step_out, default_log_kwargs)
                 self.log(f"{phase}/{name}", metric_val, **metric_specific_log_kwargs)
         elif isinstance(step_out, dict):
             loss_computed = "loss" in step_out
@@ -287,15 +293,7 @@ class AutoModule(L.LightningModule):
 
             if "metric_args" in step_out:
                 for name, args in step_out["metric_args"].items():
-                    metric_func, metric_specific_log_kwargs = _resolve_metric(self.metrics[name], curr_step_log_kwargs)
-
-                    if isinstance(metric_func, Metric):
-                        metric_func.to(device=step_out[0].device)
-                        _call_with_flexible_args(metric_func, args)
-                        metric_val = metric_func   
-                    else:
-                        metric_val = _call_with_flexible_args(metric_func, args)
-
+                    metric_val, metric_specific_log_kwargs = _get_metric_val_and_log_kwargs(self.metrics[name], args, curr_step_log_kwargs)
                     metrics_to_log.append((f"{phase}/{name}", (metric_val, metric_specific_log_kwargs)))
 
             if "metric_values" in step_out:
