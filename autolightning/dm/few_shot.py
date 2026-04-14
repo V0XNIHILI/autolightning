@@ -66,6 +66,7 @@ class FewShotMixin:
         shuffle_labels: bool = False,
         samples_per_class: Optional[Dict[str, Union[str, int]]] = None,
         batch_transform_flattened: Optional[Union[str, Dict[str, Optional[str]]]] = None,
+        non_train_iter_seed: Optional[int] = None,
         **kwargs: Unpack[AutoDataModuleKwargs],
     ):
         super().__init__(**kwargs)
@@ -80,12 +81,14 @@ class FewShotMixin:
         self.shuffle_labels = shuffle_labels
         self.samples_per_class = samples_per_class
         self.batch_transform_flattened = batch_transform_flattened
+        self.non_train_iter_seed = non_train_iter_seed
 
     def get_transformed_dataset(self, phase: str):
         dataset = super().get_transformed_dataset(phase)
 
         ways = self.ways
         query_shots = self.query_shots
+        iter_seed = self.non_train_iter_seed
 
         if phase == "train":
             if self.train_ways != -1:
@@ -93,6 +96,8 @@ class FewShotMixin:
 
             if self.train_query_shots != -1:
                 query_shots = self.train_query_shots
+
+            iter_seed = None  # We don't need a fixed seed for the training dataloader since it should be shuffled every epoch
 
         return FS(
             dataset,
@@ -102,6 +107,7 @@ class FewShotMixin:
             query_ways=self.query_ways,
             keep_original_labels=self.keep_original_labels,
             shuffle_labels=self.shuffle_labels,
+            iter_seed=iter_seed,
             samples_per_class=self.samples_per_class[phase] if self.samples_per_class else None,
         )
     
