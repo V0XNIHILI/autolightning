@@ -107,7 +107,7 @@ class FewShotMixin:
             query_ways=self.query_ways,
             keep_original_labels=self.keep_original_labels,
             shuffle_labels=self.shuffle_labels,
-            iter_seed=iter_seed,
+            seed=iter_seed,
             samples_per_class=self.samples_per_class[phase] if self.samples_per_class else None,
         )
     
