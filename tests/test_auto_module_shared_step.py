@@ -87,7 +87,7 @@ def dummy_metrics():
     """Dictionary of test metrics"""
     return {
         "accuracy": TestMetric(),
-        "f1": {"func": TestMetric(), "log_kwargs": {"prog_bar": True}},
+        "f1": {"metric": TestMetric(), "log_kwargs": {"prog_bar": True}},
     }
 
 
