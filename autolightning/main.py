@@ -91,3 +91,7 @@ def cli_main():
     # Created a separate function for the CLI that does not
     # return anything to avoid a non-zero exit code.
     auto_main()
+
+
+if __name__ == "__main__":
+    cli_main()
