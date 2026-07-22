@@ -7,7 +7,7 @@ on:
     branches: [ "main" ]
 
 jobs:
-  test:
+  ruff:
     runs-on: ubuntu-latest
 
     steps:
@@ -28,6 +28,6 @@ jobs:
         pip install ruff
         pip install .
 
-    # Run tests
+    # Run Ruff
     - name: Run Ruff
       run: ruff check

@@ -36,11 +36,6 @@ class DummyMetric(Metric):
 
 # Fixtures for different module types
 @pytest.fixture
-def dummy_module_list():
-    return nn.ModuleList([nn.Linear(10, 5), nn.Linear(5, 1)])
-
-
-@pytest.fixture
 def dummy_module_dict():
     return nn.ModuleDict({"encoder": nn.Linear(10, 5), "decoder": nn.Linear(5, 1)})
 
@@ -277,50 +272,6 @@ def test_optimizer_list_instances(dummy_net, dummy_criterion):
     assert isinstance(result[1], optim.Adam)
 
 
-def test_optimizer_list_callables_with_module_list(dummy_module_list, dummy_criterion):
-    """Tests using a list of optimizer callables with a ModuleList and verifies each optimizer is paired with its respective module."""
-    optimizer = [
-        lambda params: optim.SGD(params, lr=0.01),
-        lambda params: optim.Adam(params, lr=0.001),
-    ]
-
-    module = AutoModule(net=dummy_module_list, criterion=dummy_criterion)
-    module.register_optimizer(dummy_module_list, optimizer)
-
-    result = module.configure_optimizers()
-
-    assert isinstance(result, list)
-    assert len(result) == 2
-    assert isinstance(result[0], optim.SGD)
-    assert isinstance(result[1], optim.Adam)
-    assert result[0].param_groups[0]["lr"] == 0.01
-    assert result[1].param_groups[0]["lr"] == 0.001
-    assert result[0].param_groups[0]["params"] == list(dummy_module_list[0].parameters())
-    assert result[1].param_groups[0]["params"] == list(dummy_module_list[1].parameters())
-
-
-def test_optimizer_dict_with_moduledict(dummy_module_dict, dummy_criterion):
-    """Tests using a dictionary of optimizer callables with a ModuleDict and verifies each optimizer is paired with its respective module."""
-    optimizer = {
-        "encoder": lambda params: optim.SGD(params, lr=0.01),
-        "decoder": lambda params: optim.Adam(params, lr=0.001),
-    }
-
-    module = AutoModule(net=dummy_module_dict, criterion=dummy_criterion)
-    module.register_optimizer(dummy_module_dict, optimizer)
-
-    result = module.configure_optimizers()
-
-    assert isinstance(result, list)
-    assert len(result) == 2
-    assert isinstance(result[0], optim.SGD)
-    assert isinstance(result[1], optim.Adam)
-    assert result[0].param_groups[0]["lr"] == 0.01
-    assert result[1].param_groups[0]["lr"] == 0.001
-    assert result[0].param_groups[0]["params"] == list(dummy_module_dict["encoder"].parameters())
-    assert result[1].param_groups[0]["params"] == list(dummy_module_dict["decoder"].parameters())
-
-
 def test_optimizer_dict_with_non_moduledict(dummy_net, dummy_criterion):
     """Tests that using a dictionary of optimizers with a non-ModuleDict module raises the expected error."""
     optimizer = {
@@ -347,21 +298,6 @@ def test_list_optimizers_with_scheduler(dummy_net, dummy_criterion, dummy_lr_sch
     module.register_optimizer(dummy_net, optimizer, dummy_lr_scheduler_callable)
 
     with pytest.raises(AssertionError, match="Cannot use a list of optimizers with a scheduler"):
-        module.configure_optimizers()
-
-
-def test_dict_optimizers_with_scheduler(dummy_module_dict, dummy_criterion, dummy_lr_scheduler_callable):
-    """Tests that using a dictionary of optimizers with a scheduler raises the expected assertion error."""
-    optimizer = {
-        "encoder": lambda params: optim.SGD(params, lr=0.01),
-        "decoder": lambda params: optim.Adam(params, lr=0.001),
-    }
-
-    module = AutoModule(net=dummy_module_dict, criterion=dummy_criterion)
-
-    module.register_optimizer(dummy_module_dict, optimizer, dummy_lr_scheduler_callable)
-
-    with pytest.raises(AssertionError, match="Cannot use a dict of optimizers with a scheduler"):
         module.configure_optimizers()
 
 

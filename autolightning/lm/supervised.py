@@ -9,7 +9,11 @@ def supervised_forward(module: NetType, *args, **kwargs):
 
 
 def supervised_shared_step(phase: Phase, module: NetType, inputs: Any, targets: Any):
-    output = module(inputs)
+    if isinstance(inputs, tuple):
+        output = module(*inputs)
+    else:
+        # If inputs is a dict/list/tensor
+        output = module(inputs)
 
     return (output, targets)
 

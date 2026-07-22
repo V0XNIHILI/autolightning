@@ -1,8 +1,10 @@
-from typing import Optional, Union, List
+from typing import Optional, Union, List, Tuple
 from pathlib import Path
 import yaml
 
-from autolightning import AutoModule, AutoCLI
+from lightning.pytorch.trainer import Trainer
+
+from autolightning import AutoModule, AutoCLI, AutoDataModule
 from autolightning.auto_cli import LoggerSaveConfigCallback
 from autolightning.utils import merge_dicts
 
@@ -19,7 +21,7 @@ def get_auto_cli(args, run: bool):
     )
 
 
-def build_config(config: Union[List[dict], dict, List[str], List[Path], str, Path]):
+def build_config(config: Union[List[Union[dict, str, Path]], dict, str, Path]):
     if isinstance(config, (str, Path)):
         config = [config]
 
@@ -39,10 +41,10 @@ def build_config(config: Union[List[dict], dict, List[str], List[Path], str, Pat
 
 
 def auto_main(
-    config: Optional[Union[List[dict], dict, List[str], List[Path], str, Path]] = None,
+    config: Union[List[Union[dict, str, Path]], dict, str, Path] = None,
     subcommand: Optional[str] = None,
     run: bool = True,
-):
+) -> Tuple[Trainer, AutoModule, AutoDataModule]:
     final_config = None
 
     if config is not None:
@@ -68,7 +70,7 @@ def auto_main(
     return cli.trainer, cli.model, cli.datamodule
 
 
-def auto_data(config: Union[List[dict], dict, List[str], List[Path], str, Path], config_includes_data_key: bool = True):
+def auto_data(config: Union[List[Union[dict, str, Path]], dict, str, Path], config_includes_data_key: bool = True):
     final_config = build_config(config)
 
     if not config_includes_data_key:

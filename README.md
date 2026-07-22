@@ -17,7 +17,7 @@ Current benchmarks show an average **15% reduction in lines of code** compared t
 - [**Additional (torch) runtime flags**](#additional-runtime-flags): Enable PyTorch performance optimizations from the command line
 - [**Built-in dataset splitting**](#built-in-dataset-splitting): Random split and cross-validation support from the command line or with a configuration file
 - [**Hyperparameter optimization & model watching**](#hyperparameter-sweeps): Use Weights & Biases, Ray Tune, or Optuna for hyperparameter sweeps. Track model gradient results with Weights & Biases from the command line
-- [**Built-in training methods**](#built-in-training-methods): Pre-made modules for supervised learning, self-supervised learning, knowledge distillation, and more
+- [**Built-in training methods**](#built-in-training-methods): Pre-made modules for supervised learning, self-supervised learning, few-shot learning and more
 - [**Config-file utilities**](#config-file-utilities): Load pre-trained models, compile models, or freeze model parameters from a configuration file
 
 ## Installation
@@ -244,77 +244,7 @@ model:
   lr_scheduler:
     class_path: autolightning.sched
     dict_kwargs:
-      scheduler_path: torch.optim.lr_scheduler.CosineAnnealingLR
-      T_max: 100
-      eta_min: 0.0
-```
-
-This allows for more flexibility in the configuration file. For example, to specify different optimizers for different parts of the model:
-
-```yaml
-model:
-  net:
-    class_path: nn.ModuleDict
-    init_args:
-      modules:
-        encoder:
-          class_path: torchvision.ops.MLP
-          init_args:
-            in_channels: 784
-            hidden_channels: [100, 10]
-        decoder:
-          class_path: torchvision.ops.MLP
-          init_args:
-            in_channels: 10
-            hidden_channels: [100, 784]
-  optimizer:
-    encoder:
-      class_path: autolightning.optim
-      dict_kwargs:
-        optimizer_path: AdamW
-        lr: 1e-4
-    decoder:
-      class_path: autolightning.optim
-      dict_kwargs:
-        optimizer_path: SGD
-        lr: 1e-3
-  lr_scheduler:
-    class_path: autolightning.sched
-    dict_kwargs:
-      scheduler_path: torch.optim.lr_scheduler.CosineAnnealingLR
-      T_max: 100
-      eta_min: 0.0
-```
-
-Or, with a list of modules instead of a dict:
-
-```yaml
-model:
-  net:
-    class_path: nn.ModuleList
-    init_args:
-      modules:
-        - class_path: torchvision.ops.MLP
-          init_args:
-            in_channels: 784
-            hidden_channels: [100, 10]
-        - class_path: torchvision.ops.MLP
-          init_args:
-            in_channels: 10
-            hidden_channels: [100, 784]
-  optimizer:
-    - class_path: autolightning.optim
-      dict_kwargs:
-        optimizer_path: AdamW
-        lr: 1e-4
-    - class_path: autolightning.optim
-      dict_kwargs:
-        optimizer_path: SGD
-        lr: 1e-3
-  lr_scheduler:
-    class_path: autolightning.sched
-    dict_kwargs:
-      scheduler_path: torch.optim.lr_scheduler.CosineAnnealingLR
+      lr_scheduler_path: torch.optim.lr_scheduler.CosineAnnealingLR
       T_max: 100
       eta_min: 0.0
 ```
@@ -509,9 +439,6 @@ analysis = tune.run(tune_function, config=search_space)
 #### Supervised Learning
 - [**`Supervised`**](./autolightning/lm/supervised.py): General supervised learning
 - [**`Classifier`**](./autolightning/lm/classifier.py): Classification tasks
-
-#### Knowledge Distillation
-- [**`Distilled`**](./autolightning/lm/distilled.py): Knowledge distillation with optional student head and regressor
 
 #### Quantization-Aware Training
 - [**`BrevitasSupervised`, `BrevitasClassifier`, `BrevitasPrototypical`**](./autolightning/lm/brevitas.py): QAT with Brevitas
