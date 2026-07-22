@@ -63,17 +63,10 @@ class CIFAR10(RootDownloadTrain):
 
 
 class FashionMNIST(RootDownloadTrain):
-    def __init__(
-        self,
-        root: str,
-        download: bool = False,
-        val_percentage: float = 0.1,
-        **kwargs: Unpack[AutoDataModuleKwargsNoDatasetPrepareSplit],
-    ):
-        super().__init__(
-            name="FashionMNIST",
-            root=root,
-            download=download,
-            val_percentage=val_percentage,
-            **kwargs,
-        )
+    def __init__(self, root: str, download: bool = False, val_percentage: float = 0.1, **kwargs: Unpack[AutoDataModuleKwargsNoDatasetPrepareSplit]):
+        super().__init__(name="FashionMNIST", root=root, download=download, val_percentage=val_percentage, **kwargs)
+
+
+class CIFAR100(RootDownloadTrain):
+    def __init__(self, root: str, download: bool = False, val_percentage: float = 0.1, **kwargs: Unpack[AutoDataModuleKwargsNoDatasetPrepareSplit]):
+        super().__init__(name="CIFAR100", root=root, download=download, val_percentage=val_percentage, **kwargs)
