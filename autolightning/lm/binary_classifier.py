@@ -4,18 +4,8 @@ import torch.nn as nn
 
 from torch_mate.utils import calc_binary_accuracy
 
-from .supervised import Supervised, supervised_forward
-from ..types import AutoModuleKwargsNoCriterion, Unpack, Phase, NetType
-
-
-def binary_classifier_shared_step(phase: Phase, module: NetType, inputs: Any, targets: Any):
-    if isinstance(inputs, tuple):
-        output = module(*inputs)
-    else:
-        # If inputs is a dict/list/tensor
-        output = module(inputs)
-
-    return (output, targets.float())
+from .supervised import Supervised, supervised_forward, supervised_shared_step
+from ..types import AutoModuleKwargsNoCriterion, Unpack, Phase
 
 
 class BinaryClassifierMixin:
@@ -33,7 +23,8 @@ class BinaryClassifierMixin:
         return supervised_forward(self.net, *args, **kwargs).flatten()
 
     def shared_step(self, phase: Phase, batch, batch_idx):
-        return binary_classifier_shared_step(phase, self, batch[0], batch[1])
+        output, targets = supervised_shared_step(phase, self, batch[0], batch[1])
+        return output, targets.float()
 
     def configure_metrics(self):
         return {
