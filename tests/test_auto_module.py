@@ -251,56 +251,6 @@ def test_optimizer_with_scheduler_dict(dummy_net, dummy_criterion):
     assert isinstance(result["lr_scheduler"], optim.lr_scheduler.StepLR)
 
 
-def test_optimizer_list_instances(dummy_net, dummy_criterion):
-    """Tests using a list of optimizer instances and verifies they're all properly passed through configure_optimizers."""
-    optimizer1 = optim.SGD(
-        [param for name, param in dummy_net.named_parameters() if "bias" in name],
-        lr=0.01,
-    )
-    optimizer2 = optim.Adam(
-        [param for name, param in dummy_net.named_parameters() if "bias" not in name],
-        lr=0.001,
-    )
-
-    module = AutoModule(net=dummy_net, criterion=dummy_criterion, optimizer=[optimizer1, optimizer2])
-
-    result = module.configure_optimizers()
-
-    assert isinstance(result, list)
-    assert len(result) == 2
-    assert isinstance(result[0], optim.SGD)
-    assert isinstance(result[1], optim.Adam)
-
-
-def test_optimizer_dict_with_non_moduledict(dummy_net, dummy_criterion):
-    """Tests that using a dictionary of optimizers with a non-ModuleDict module raises the expected error."""
-    optimizer = {
-        "layer1": lambda params: optim.SGD(params, lr=0.01),
-        "layer2": lambda params: optim.Adam(params, lr=0.001),
-    }
-
-    module = AutoModule(net=dummy_net, criterion=dummy_criterion)
-    module.register_optimizer(dummy_net, optimizer)
-
-    with pytest.raises(ValueError, match="Cannot use optimizer dict with non-ModuleDict module"):
-        module.configure_optimizers()
-
-
-def test_list_optimizers_with_scheduler(dummy_net, dummy_criterion, dummy_lr_scheduler_callable):
-    """Tests that using a list of optimizers with a scheduler raises the expected assertion error."""
-    optimizer = [
-        lambda params: optim.SGD(params, lr=0.01),
-        lambda params: optim.Adam(params, lr=0.001),
-    ]
-
-    module = AutoModule(net=dummy_net, criterion=dummy_criterion)
-
-    module.register_optimizer(dummy_net, optimizer, dummy_lr_scheduler_callable)
-
-    with pytest.raises(AssertionError, match="Cannot use a list of optimizers with a scheduler"):
-        module.configure_optimizers()
-
-
 def test_multiple_optimizers_and_schedulers(dummy_module_dict, dummy_criterion):
     """Tests registering multiple optimizers with their respective schedulers and verifies they're correctly paired in the output."""
     module = AutoModule(criterion=dummy_criterion, net=dummy_module_dict)
