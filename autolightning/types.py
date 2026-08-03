@@ -17,18 +17,34 @@ except ImportError:
 
 import torch.nn as nn
 from torch.optim.optimizer import Optimizer
+from torch.optim.lr_scheduler import LRScheduler
+from torch.utils.data import Dataset, IterableDataset
 
 from torchmetrics.metric import Metric
-from lightning.pytorch.cli import OptimizerCallable, LRSchedulerCallable
+from lightning.pytorch.cli import OptimizerCallable, LRSchedulerCallable, ReduceLROnPlateau
+from torch.optim.lr_scheduler import ReduceLROnPlateau as PTReduceLROnPlateau
+
+LRSchedulerCallableWithPTPlateu = Callable[[Optimizer], Union[LRScheduler, PTReduceLROnPlateau]]
+
+LRSchedulerCallableAll = Callable[[Optimizer], Union[LRScheduler, ReduceLROnPlateau, PTReduceLROnPlateau]]
+
+DatasetType = Union[Dataset, IterableDataset]
+
+class LrSchedulerConfigType(TypedDict, total=False):
+    scheduler: Union[LRSchedulerCallableWithPTPlateu, LRScheduler, PTReduceLROnPlateau]
+    interval: str
+    frequency: int
+    monitor: str
+    strict: bool
+    name: Optional[str]
+
 
 MetricType = Dict[str, Union[Metric, Callable[..., Any]]]
 OptimizerType = Union[
     Optimizer,
-    OptimizerCallable,
-    Iterable[Union[Optimizer, OptimizerCallable]],
-    Dict[str, OptimizerCallable],
+    OptimizerCallable
 ]
-LrSchedulerType = Union[LRSchedulerCallable, Dict]
+LrSchedulerType = Union[LRSchedulerCallable, LRScheduler, ReduceLROnPlateau, LrSchedulerConfigType]
 IterableOfModules = Iterable[nn.Module]
 
 try:
@@ -39,6 +55,8 @@ NetType = Union[nn.Module, BAMC]
 
 CallableOrModule = Union[Callable, nn.Module]
 TransformValue = Union[List[CallableOrModule], CallableOrModule]
+
+PHASES = ["train", "val", "test", "pred"]
 
 Phase = Literal["train", "val", "test", "pred"]
 

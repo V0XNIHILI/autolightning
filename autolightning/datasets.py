@@ -1,3 +1,5 @@
+from torch.utils.data import Dataset
+
 from . import AutoDataModule
 from .types import AutoDataModuleKwargsNoDatasetPrepareSplit, Unpack
 
@@ -20,8 +22,8 @@ class RootDownloadTrain(AutoDataModule):
                 ),
             },
             random_split={
-                "source": "defaults",
-                "dest": dict(train=1 - val_percentage, val=val_percentage),
+                "train": 1 - val_percentage,
+                "val": val_percentage
             },
             requires_prepare=download,
             **kwargs,
@@ -77,3 +79,16 @@ class FashionMNIST(RootDownloadTrain):
             val_percentage=val_percentage,
             **kwargs,
         )
+
+
+class _DummyDataset(Dataset):
+    def __init__(self, n=10, tag="default", **kwargs):
+        self.n = n
+        self.tag = tag
+        self.kwargs = kwargs
+
+    def __len__(self):
+        return self.n
+
+    def __getitem__(self, i):
+        return i

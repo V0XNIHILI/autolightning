@@ -6,8 +6,10 @@ import importlib
 import torch
 import torch.nn as nn
 
-from lightning.pytorch.cli import OptimizerCallable, LRSchedulerCallable
+from lightning.pytorch.cli import OptimizerCallable
 from pytorch_lightning.cli import instantiate_class
+
+from autolightning.types import LRSchedulerCallableAll
 
 
 LIGHTNING_STATE_DICT_KEYS = [
@@ -134,7 +136,7 @@ def optim(optimizer_path: str, **kwargs: Any) -> OptimizerCallable:
     return partial(optimizer_class, **kwargs)
 
 
-def sched(lr_scheduler_path: str, **kwargs: Any) -> LRSchedulerCallable:
+def sched(lr_scheduler_path: str, **kwargs: Any) -> LRSchedulerCallableAll:
     scheduler_class = _import_module(lr_scheduler_path, default_module="torch.optim.lr_scheduler")
 
     return partial(scheduler_class, **kwargs)
