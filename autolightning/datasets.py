@@ -81,6 +81,11 @@ class FashionMNIST(RootDownloadTrain):
         )
 
 
+class CIFAR100(RootDownloadTrain):
+    def __init__(self, root: str, download: bool = False, val_percentage: float = 0.1, **kwargs: Unpack[AutoDataModuleKwargsNoDatasetPrepareSplit]):
+        super().__init__(name="CIFAR100", root=root, download=download, val_percentage=val_percentage, **kwargs)
+
+
 class _DummyDataset(Dataset):
     def __init__(self, n=10, tag="default", **kwargs):
         self.n = n
