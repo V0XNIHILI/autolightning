@@ -9,11 +9,16 @@ import lightning as L
 from pytorch_lightning.utilities.types import OptimizerLRScheduler
 from torchmetrics.metric import Metric
 
-from .types import MetricType, OptimizerType, LrSchedulerType, NetType, Phase
+from .types import MetricType, OptimizerType, LrSchedulerType, NetType, Phase, PHASES
 
 
 LOG_PHASE_KEYS = {"train", "val", "test", "predict"}
 LOG_ORDER_OPTIONS = {"phase_first", "metric_first"}
+
+# `nn.ModuleDict` keys go through `add_module`, which rejects names that shadow existing
+# attributes -- "train" would collide with `nn.Module.train`. Prefix the phase keys.
+PHASE_MODULE_KEY = "phase_{}".format
+
 KEYS_TO_IGNORE = [
     "net",
     "criterion",
@@ -25,6 +30,17 @@ KEYS_TO_IGNORE = [
 
 
 def _call_with_flexible_args(func: Callable, args: Any) -> Any:
+    """Call `func` with `args`, using the calling convention implied by the container type.
+
+    NOTE: tuples and lists are NOT interchangeable here:
+
+    - `tuple` -> `func(*args)`     : each element becomes a separate positional argument
+    - `dict`  -> `func(**args)`    : each item becomes a keyword argument
+    - `list`  -> `func(args)`      : the list is passed as a SINGLE positional argument
+
+    Use a tuple unless the callee genuinely expects one sequence argument
+    (e.g. a loss over a variable-length list of tensors).
+    """
     if isinstance(args, tuple):
         return func(*args)
     if isinstance(args, list):
@@ -43,6 +59,25 @@ def _resolve_metric(metric, default_log_kwargs: Dict[str, Any]) -> Tuple[Union[C
         metric_specific_log_kwargs = default_log_kwargs | metric.get("log_kwargs", {})
 
     return metric_func_or_value, metric_specific_log_kwargs
+
+
+def _unpack_metric_entry(entry: Any):
+    """Split a metric registry entry into (metric, log_kwargs, phases).
+
+    An entry is either the bare metric (a `Metric` instance or any callable), or a dict
+    of the form `{"metric": ..., "log_kwargs": {...}, "phases": ("val", "test")}`.
+    `phases` restricts the metric to a subset of phases and defaults to all of them.
+    """
+    if isinstance(entry, dict):
+        phases = tuple(entry.get("phases", PHASES))
+
+        for phase in phases:
+            if phase not in PHASES:
+                raise ValueError(f"Invalid phase '{phase}'; expected one of {PHASES}")
+
+        return entry["metric"], entry.get("log_kwargs", {}), phases
+
+    return entry, {}, PHASES
 
 
 def _get_scheduler(scheduler: LrSchedulerType, optimizer: optim.Optimizer, should_be_callable: bool = False):
@@ -75,18 +110,36 @@ def _get_scheduler(scheduler: LrSchedulerType, optimizer: optim.Optimizer, shoul
     )
 
 
-def _get_metric_val_and_log_kwargs(metric: Union[Metric, Callable[..., Any]], metric_input: Union[Tuple, List], default_log_kwargs: Dict[str, Any]):
-    metric_func, metric_specific_log_kwargs = _resolve_metric(metric, default_log_kwargs)
+def _compute_metric(
+    metric: Union[Metric, Callable[..., Any]],
+    metric_input: Union[Tuple, List, Dict],
+    log_kwargs: Optional[Dict[str, Any]] = None,
+):
+    """Update a stateful metric (returning the metric object itself, so that Lightning owns
+    the compute/reset lifecycle) or call a stateless metric and return its value.
 
-    if isinstance(metric_func, Metric):
-        metric_func.to(device=metric_input[0].device)
-        _call_with_flexible_args(metric_func.update, metric_input)
-        metric_val = metric_func   
-    else:
-        metric_val = _call_with_flexible_args(metric_func, metric_input)
+    `update()` vs `forward()` matters here. Lightning's `_ResultMetric` reads a logged `Metric`
+    through `metric._forward_cache` when `on_step=True`, and only calls `compute()` when
+    `on_epoch=True`. torchmetrics fills `_forward_cache` in `forward()` (i.e. `metric(...)`),
+    NOT in `update()` -- so an `update()`-only metric logged with `on_step=True` silently
+    produces nothing. Use `forward()` whenever step-level logging was actually requested.
 
-    return metric_val, metric_specific_log_kwargs
+    Stateful metrics are not moved to the input device here: they live in `self._metrics`,
+    which is an `nn.ModuleDict` and therefore moved along with the LightningModule.
+    """
+    if isinstance(metric, Metric):
+        if (log_kwargs or {}).get("on_step", False):
+            # Only reachable when step-level logging was explicitly requested; see
+            # `default_log_kwargs` in `shared_logged_step`, which makes on_step/on_epoch explicit
+            # so this check can never disagree with what Lightning will actually do.
+            # forward() updates the global state *and* returns/caches the batch value
+            _call_with_flexible_args(metric, metric_input)
+        else:
+            _call_with_flexible_args(metric.update, metric_input)
 
+        return metric
+
+    return _call_with_flexible_args(metric, metric_input)
 
 
 class AutoModule(L.LightningModule):
@@ -128,6 +181,22 @@ class AutoModule(L.LightningModule):
             log_metrics: Whether to log metrics
             exclude_no_grad: Whether to exclude non-trainable parameters from optimizer
             disable_prog_bar: If True, disables progress bar updates during validation
+
+        Metrics may be given either as a bare metric (any callable, or a `torchmetrics.Metric`
+        instance) or as a config dict::
+
+            metrics = {
+                "acc": Accuracy(task="multiclass", num_classes=10),
+                "auroc": {
+                    "metric": AUROC(task="multiclass", num_classes=10),
+                    "log_kwargs": {"on_step": False, "on_epoch": True},
+                    "phases": ("val", "test"),   # skip during training
+                },
+            }
+
+        Stateful (`torchmetrics.Metric`) entries are cloned once per phase at construction time,
+        so train/val/test each accumulate into their own buffers and cannot leak into one another.
+        Stateless callables carry no state and are shared across phases.
         """
 
         super().__init__()
@@ -135,24 +204,28 @@ class AutoModule(L.LightningModule):
         self.net = net
         self.criterion = criterion
         self.optimizers_schedulers = {}
-        self.metrics = {} if metrics is None else metrics
+
+        self.exclude_no_grad = exclude_no_grad
 
         self.register_optimizer(self, optimizer, lr_scheduler)
 
-        self.metrics = self.configure_metrics() | self.metrics
-        self.register_torchmetrics()
+        # `self.metrics` is kept as the raw, un-cloned user specification (for introspection).
+        # The objects actually used during a step live in `self._metrics`.
+        self.metrics = self.configure_metrics() | ({} if metrics is None else metrics)
+        self._build_per_phase_metrics(self.metrics)
 
         self.loss_log_key = loss_log_key
         self.log_metrics = log_metrics
-
-        self.exclude_no_grad = exclude_no_grad
 
         self.disable_prog_bar = disable_prog_bar
 
         self.save_hyperparameters(ignore=KEYS_TO_IGNORE)
 
     def parameters_for_optimizer(self, recurse: bool = True) -> Iterator[Parameter]:
-        params = self.parameters(recurse)
+        yield from self.module_parameters_for_optimizer(self, recurse)
+
+    def module_parameters_for_optimizer(self, module: nn.Module, recurse: bool = True) -> Iterator[Parameter]:
+        params = module.parameters(recurse)
 
         if self.exclude_no_grad:
             for param in params:
@@ -167,6 +240,15 @@ class AutoModule(L.LightningModule):
         optimizer: Optional[OptimizerType] = None,
         lr_scheduler: Optional[LrSchedulerType] = None,
     ):
+        """Attach an optimizer (and optionally a scheduler) to `module`.
+
+        NOTE: registering a module here does NOT add it to the module tree. `optimizers_schedulers`
+        keys are only used to resolve parameters at `configure_optimizers` time. Any module passed
+        here must also be reachable as an attribute (or inside a registered container such as
+        `nn.ModuleList`/`nn.ModuleDict`) of this `LightningModule`, otherwise its parameters will
+        not be moved to the accelerator, will not appear in `state_dict()`, and will not be synced
+        under DDP.
+        """
         if optimizer is not None:
             if module in self.optimizers_schedulers:
                 warnings.warn(
@@ -178,62 +260,99 @@ class AutoModule(L.LightningModule):
             raise ValueError("Cannot register a scheduler when the optimizer is None")
 
     def configure_optimizers(self) -> OptimizerLRScheduler:
-        optimizers = []
-        schedulers = []
+        # One config dict per registered optimizer, so that each scheduler stays explicitly
+        # paired with its own optimizer. Returning `(optimizers, schedulers)` instead would make
+        # Lightning pair the two lists positionally, which silently mismatches as soon as one
+        # optimizer has a scheduler and another does not.
+        # See [here](https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.core.LightningModule.html#lightning.pytorch.core.LightningModule.configure_optimizers)
+        # for return values allowed by Lightning
+        configs: List[Dict[str, Any]] = []
 
         for module, (optimizer, scheduler) in self.optimizers_schedulers.items():
             # Single initialized optimizer, with optional scheduler
             if isinstance(optimizer, optim.Optimizer):
-                optimizers.append(optimizer)
-
-                if scheduler is not None:
-                    schedulers.append(_get_scheduler(scheduler, optimizer))
+                opt_inst = optimizer
+                sched_inst = None if scheduler is None else _get_scheduler(scheduler, opt_inst)
             # Callable that returns an optimizer instance, with optional scheduler
             elif callable(optimizer):
-                params = self.parameters_for_optimizer() if module == self else module.parameters()
-                optimizers.append(optimizer(params))
-
-                if scheduler is not None:
-                    schedulers.append(_get_scheduler(scheduler, optimizers[-1], should_be_callable=True))
+                opt_inst = optimizer(self.module_parameters_for_optimizer(module))
+                sched_inst = None if scheduler is None else _get_scheduler(scheduler, opt_inst, should_be_callable=True)
             else:
                 raise TypeError(f"Invalid optimizer type: {type(optimizer)}")
 
-        # Format return value according to Lightning's expectations.
-        # See [here](https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.core.LightningModule.html#lightning.pytorch.core.LightningModule.configure_optimizers)
-        # for return values allowed by Lightning
+            config: Dict[str, Any] = {"optimizer": opt_inst}
 
-        if schedulers == []:
-            if optimizers == []:
-                return None
+            if sched_inst is not None:
+                config["lr_scheduler"] = sched_inst
 
-            if len(optimizers) == 1:
-                return optimizers[0]
+            configs.append(config)
 
-            return optimizers
+        if configs == []:
+            return None
 
-        if optimizers == []:
-            raise ValueError("Schedulers were specified but no optimizers were provided")
+        if len(configs) == 1:
+            if "lr_scheduler" not in configs[0]:
+                return configs[0]["optimizer"]
+            return configs[0]
 
-        if len(optimizers) == 1 and len(schedulers) == 1:
-            return {"optimizer": optimizers[0], "lr_scheduler": schedulers[0]}
-
-        return optimizers, schedulers
+        return configs
 
     def configure_metrics(self) -> MetricType:
         return {}
-    
-    def register_torchmetrics(self):
-        # It is necessary to have all torch metrics instances registered as sub NN modules
-        # in order for the .update calls on the metrics to work without errors
 
-        torch_metrics = {}
+    def _build_per_phase_metrics(self, metrics: MetricType) -> None:
+        """Materialise the metric registry once per phase.
 
-        for name, metric in self.metrics.items():
-            if isinstance(metric, Metric):
-                torch_metrics[name] = metric
+        A `torchmetrics.Metric` is stateful: `update()` accumulates into buffers owned by that
+        specific instance. Sharing one instance across phases means validation batches land in the
+        same buffers the training epoch is accumulating into (validation runs *inside* the training
+        epoch), and whichever phase resets first wipes the other's state. Giving each phase its own
+        clone makes that structurally impossible. Stateless callables have nothing to leak, so they
+        are shared rather than copied.
+        """
+        self._metric_log_kwargs: Dict[Tuple[Phase, str], Dict[str, Any]] = {}
+        self._metric_names: Dict[Phase, List[str]] = {phase: [] for phase in PHASES}
+        self._stateless_metrics: Dict[Phase, Dict[str, Callable]] = {phase: {} for phase in PHASES}
+        stateful: Dict[Phase, Dict[str, Metric]] = {phase: {} for phase in PHASES}
 
-        if torch_metrics != {}:
-            self._torchmetrics = nn.ModuleDict(torch_metrics)
+        for name, entry in metrics.items():
+            metric, log_kwargs, phases = _unpack_metric_entry(entry)
+
+            for phase in phases:
+                self._metric_names[phase].append(name)
+
+                if isinstance(metric, Metric):
+                    self._metric_log_kwargs[(phase, name)] = log_kwargs
+                else:
+                    self._metric_log_kwargs[(phase, name)] = log_kwargs
+
+                if isinstance(metric, Metric):
+                    stateful[phase][name] = metric.clone()
+                else:
+                    self._stateless_metrics[phase][name] = metric
+
+        # Registering the clones as submodules is what gives them device placement and DDP sync.
+        self._metrics = nn.ModuleDict(
+            {PHASE_MODULE_KEY(phase): nn.ModuleDict(named) for phase, named in stateful.items() if named != {}}
+        )
+
+    def metrics_for(self, phase: Phase) -> Dict[str, Union[Metric, Callable]]:
+        """The metric instances belonging to `phase`, keyed by name, in registration order.
+
+        Stateful metrics are read live from `self._metrics` rather than from a cached dict,
+        so that a deep-copied module (EMA, SWA, ...) resolves to its own clones.
+        """
+        key = PHASE_MODULE_KEY(phase)
+        stateful = self._metrics[key] if key in self._metrics else {}
+        stateless = self._stateless_metrics[phase]
+
+        return {
+            name: (stateful[name] if name in stateful else stateless[name])
+            for name in self._metric_names[phase]
+        }
+
+    def log_kwargs_for(self, phase: Phase, name: str, base: Dict[str, Any]) -> Dict[str, Any]:
+        return base | self._metric_log_kwargs.get((phase, name), {})
 
     def should_enable_prog_bar(self, phase: Phase):
         if self.disable_prog_bar:
@@ -250,6 +369,10 @@ class AutoModule(L.LightningModule):
             where "loss" is the loss value or a tuple/list of inputs for the loss function
             and "metric_values" is a dict containing the metric values, "metric_args" inputs to the metric function
             or a single value that is passed to all metrics
+
+        NOTE on tuples vs lists: a tuple is splatted (`criterion(*step_out)`) while a list is passed
+        as one argument (`criterion(step_out)`). Return a tuple for the usual `(y_hat, y)` case.
+        See `_call_with_flexible_args`.
         """
 
         raise NotImplementedError
@@ -265,16 +388,33 @@ class AutoModule(L.LightningModule):
 
         step_out = self.shared_step(phase, *args, **kwargs)
 
-        default_log_kwargs: Dict[str, Any] = dict(prog_bar=self.should_enable_prog_bar(phase))
+        # Spell out Lightning's per-hook defaults (training_step: on_step=True/on_epoch=False,
+        # everything else: the reverse) instead of leaving them implicit. `_compute_metric` has to
+        # know whether Lightning will read `metric._forward_cache` or call `metric.compute()`, and
+        # an absent key would make it guess wrong. Can se seen in 
+        # pytorch-lightning/src/lightning/pytorch/trainer/connectors/logger_connector/fx_validator.py,
+        # search for "training_step".
+        default_log_kwargs: Dict[str, Any] = dict(
+            prog_bar=self.should_enable_prog_bar(phase),
+        )
+
+        if phase != 'predict':
+            default_log_kwargs.update(
+                on_step=phase == "train",
+                on_epoch=phase != "train",
+            )
+
         loss = None
 
         if isinstance(step_out, (tuple, list)):
             loss = _call_with_flexible_args(self.criterion, step_out)
 
-            # Compute all the provided metrics using the same step_out as input, and log them with their respective log kwargs (if provided)
-            for name, metric in self.metrics.items():
-                metric_val, metric_specific_log_kwargs = _get_metric_val_and_log_kwargs(metric, step_out, default_log_kwargs)
-                self.log(f"{phase}/{name}", metric_val, **metric_specific_log_kwargs)
+            # Compute all the metrics registered for this phase using the same step_out as input,
+            # and log them with their respective log kwargs (if provided)
+            for name, metric in self.metrics_for(phase).items():
+                metric_log_kwargs = self.log_kwargs_for(phase, name, default_log_kwargs)
+                metric_val = _compute_metric(metric, step_out, metric_log_kwargs)
+                self.log(f"{phase}/{name}", metric_val, **metric_log_kwargs)
         elif isinstance(step_out, dict):
             loss_computed = "loss" in step_out
             criterion_args_provided = "criterion_args" in step_out
@@ -290,10 +430,16 @@ class AutoModule(L.LightningModule):
 
             curr_step_log_kwargs = default_log_kwargs | step_out.get("log_kwargs", {})
             metrics_to_log = []  # Store in list to avoid duplicate keys in the log by checking list before logging
+            phase_metrics = self.metrics_for(phase)
 
             if "metric_args" in step_out:
                 for name, args in step_out["metric_args"].items():
-                    metric_val, metric_specific_log_kwargs = _get_metric_val_and_log_kwargs(self.metrics[name], args, curr_step_log_kwargs)
+                    if name not in phase_metrics:
+                        # Metric is registered but excluded from this phase via its "phases" key
+                        continue
+
+                    metric_specific_log_kwargs = self.log_kwargs_for(phase, name, curr_step_log_kwargs)
+                    metric_val = _compute_metric(phase_metrics[name], args, metric_specific_log_kwargs)
                     metrics_to_log.append((f"{phase}/{name}", (metric_val, metric_specific_log_kwargs)))
 
             if "metric_values" in step_out:
