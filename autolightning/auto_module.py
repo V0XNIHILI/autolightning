@@ -293,6 +293,7 @@ class AutoModule(L.LightningModule):
         if len(configs) == 1:
             if "lr_scheduler" not in configs[0]:
                 return configs[0]["optimizer"]
+
             return configs[0]
 
         return configs
