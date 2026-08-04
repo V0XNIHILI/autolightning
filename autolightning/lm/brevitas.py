@@ -22,7 +22,7 @@ from brevitas_utils import (
 from brevitas_utils.creation import create_quantizer
 from brevitas_utils.bias_correction import add_zero_bias_to_linear
 
-from . import Supervised, Classifier, Prototypical, ICLClassifier
+from . import Supervised, Classifier, Prototypical, ICLClassifier, BinaryClassifier
 from ..utils import _import_module
 from ..types import AutoModuleKwargs, Unpack
 
@@ -283,3 +283,6 @@ class BrevitasICLClassifier(BrevitasMixin, ICLClassifier):
 
         super().__init__(**kwargs)
 
+
+class BrevitasBinaryClassifier(BrevitasMixin, BinaryClassifier):
+    pass
