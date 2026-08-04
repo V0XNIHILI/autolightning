@@ -185,10 +185,10 @@ class AutoDataModule(L.LightningDataModule):
 
         self.instantiated_dataset.update(self.plan.build(phases, self.seed))
 
-    def has_dataset(self, phase: Phase) -> bool:
+    def has_dataset_in_plan(self, phase: Phase) -> bool:
         """Whether this configuration can produce a dataset for `phase` at all."""
 
-        assert self.plan is not None, "Dataset plan must be built before calling has_dataset"
+        assert self.plan is not None, "Dataset plan must be built before calling has_dataset_in_plan"
 
         return phase in self.plan.available_phases
 
@@ -196,7 +196,7 @@ class AutoDataModule(L.LightningDataModule):
         if phase in self.instantiated_dataset:
             return self.instantiated_dataset[phase]
 
-        if not self.has_dataset(phase):
+        if not self.has_dataset_in_plan(phase):
             raise KeyError(
                 f"No dataset is configured for phase '{phase}'; configure one explicitly, or use "
                 f"'random_split' or 'cross_val' to derive it from the 'train' dataset"

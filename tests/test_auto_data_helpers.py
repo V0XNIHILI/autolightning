@@ -235,8 +235,8 @@ def test_requesting_a_configured_phase_before_setup_reports_it():
         ({"cross_val": {"n_folds": 5, "fold_idx": 0}}, "val", True),
     ],
 )
-def test_has_dataset(kwargs, phase, expected):
-    assert AutoDataModule(dataset=dummy(), **kwargs).has_dataset(phase) is expected
+def test_has_dataset_in_plan(kwargs, phase, expected):
+    assert AutoDataModule(dataset=dummy(), **kwargs).has_dataset_in_plan(phase) is expected
 
 
 def test_unknown_stage_is_ignored():

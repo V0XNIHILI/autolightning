@@ -222,7 +222,7 @@ def test_regular_dataset_has_no_validation_split(cifar_train):
     data = AutoDataModule(dataset=cifar_train)
     data.setup("fit")
 
-    assert not data.has_dataset("val")
+    assert not data.has_dataset_in_plan("val")
 
     with pytest.raises(KeyError, match="No dataset is configured for phase 'val'"):
         data.get_dataset("val")
@@ -297,8 +297,8 @@ def test_get_dataset_before_setup():
         ({"cross_val": {"n_folds": 5, "fold_idx": 0}}, "pred", False),
     ],
 )
-def test_has_dataset(kwargs, phase, expected):
-    assert AutoDataModule(dataset=counting_spec(), **kwargs).has_dataset(phase) is expected
+def test_has_dataset_in_plan(kwargs, phase, expected):
+    assert AutoDataModule(dataset=counting_spec(), **kwargs).has_dataset_in_plan(phase) is expected
 
 
 # ---------------------------------------------------------------------------
