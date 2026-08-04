@@ -5,24 +5,24 @@ import pytest
 from torch.utils.data import Subset
 from jsonargparse import Namespace
 
-from autolightning.datasets import DummyDataset
+from autolightning.datasets import _DummyDataset
 from autolightning.auto_data_module import AutoDataModule
 from autolightning.auto_data_helpers import normalize_dataset_config
 
 
-DUMMY_PATH = "autolightning.datasets.DummyDataset"
+DUMMY_PATH = "autolightning.datasets._DummyDataset"
 
 N = 10
 N_TRAIN, N_VAL, N_TEST = 8, 1, 1
 
 
 def dummy(**args):
-    """A `{'class_name': ..., 'args': ...}` spec pointing at DummyDataset."""
+    """A `{'class_name': ..., 'args': ...}` spec pointing at _DummyDataset."""
     return {"class_name": DUMMY_PATH, "args": {"n": N, **args}}
 
 
-class RecordingDataset(DummyDataset):
-    """DummyDataset that remembers every instance, to check what gets built and when."""
+class RecordingDataset(_DummyDataset):
+    """_DummyDataset that remembers every instance, to check what gets built and when."""
 
     created = []
 
@@ -53,7 +53,7 @@ def test_none_declares_nothing():
 
 
 def test_dataset_instance_is_declared_as_train():
-    ds = DummyDataset()
+    ds = _DummyDataset()
     assert normalize_dataset_config(ds) == {"train": ds}
 
 
@@ -72,7 +72,7 @@ def test_per_phase_args_expand_to_one_spec_per_phase():
 
 
 def test_per_phase_declarations_are_passed_through():
-    ds = DummyDataset()
+    ds = _DummyDataset()
     declared = normalize_dataset_config({"train": ds, "val": dummy()})
 
     assert declared["train"] is ds
@@ -84,7 +84,7 @@ def test_per_phase_declarations_are_passed_through():
     [
         (42, "can either be None"),
         ({"foo": "bar"}, "Unsupported dataset configuration"),
-        ({"train": DummyDataset(), "valid": DummyDataset()}, "Unsupported phase key"),
+        ({"train": _DummyDataset(), "valid": _DummyDataset()}, "Unsupported phase key"),
         ({"train": {"cls": DUMMY_PATH}}, "Unsupported dataset configuration for phase"),
         ({"class_name": DUMMY_PATH, "args": {"defaults": {"n": 4}}}, "only meaningful together with per-phase"),
         ({"class_name": DUMMY_PATH, "args": {"train": {"tag": "tr"}, "n": 4}}, "only other allowed key"),
@@ -104,11 +104,11 @@ def test_invalid_configurations_are_rejected(config, message):
 def test_class_name_as_string_path():
     built = AutoDataModule(dataset=dummy(tag="tr")).plan.build(["train"], 42)["train"]
 
-    assert isinstance(built, DummyDataset) and built.tag == "tr"
+    assert isinstance(built, _DummyDataset) and built.tag == "tr"
 
 
 def test_class_name_as_class_object():
-    built = AutoDataModule(dataset={"class_name": DummyDataset, "args": {"n": 7}}).plan.build(["train"], 42)["train"]
+    built = AutoDataModule(dataset={"class_name": _DummyDataset, "args": {"n": 7}}).plan.build(["train"], 42)["train"]
 
     assert len(built) == 7
 
@@ -280,7 +280,7 @@ def test_random_split_only_returns_the_requested_phases():
 
 
 def test_random_split_replaces_train_rather_than_using_the_source():
-    source = DummyDataset(n=N)
+    source = _DummyDataset(n=N)
     dm = AutoDataModule(dataset=source, random_split={"train": N_TRAIN, "val": N - N_TRAIN})
     dm.setup("fit")
 
@@ -403,7 +403,7 @@ def test_splitting_requires_a_train_dataset(kwargs):
 
 
 def test_a_bare_dataset_is_usable_as_the_train_split():
-    ds = DummyDataset()
+    ds = _DummyDataset()
     dm = AutoDataModule(dataset=ds)
     dm.prepare_data()
     dm.setup("fit")
