@@ -1,3 +1,5 @@
+from functools import partial
+
 import pytest
 import torch.nn as nn
 import torch.optim as optim
@@ -5,6 +7,8 @@ from torchmetrics.metric import Metric
 from torch.optim.lr_scheduler import StepLR
 
 from autolightning import AutoModule
+
+from test_metrics import TupleProbe
 
 
 # Dummy Components
@@ -313,3 +317,80 @@ def test_invalid_scheduler_type(dummy_net, dummy_criterion):
 
     with pytest.raises(TypeError, match="Invalid scheduler type"):
         module.configure_optimizers()
+
+class MultiOpt(AutoModule):
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        self.head = nn.Linear(3, 3)
+        self.register_optimizer(
+            self.head,
+            partial(optim.SGD, lr=0.5),
+            lambda o: optim.lr_scheduler.StepLR(o, step_size=1),
+        )
+
+    def shared_step(self, phase, batch, batch_idx):
+        x, y = batch
+        return self.head(self.net(x)), y
+
+
+def test_scheduler_stays_paired_with_its_optimizer():
+    m = MultiOpt(net=nn.Linear(4, 3), criterion=nn.CrossEntropyLoss(), optimizer=partial(optim.SGD, lr=0.01))
+    configs = m.configure_optimizers()
+
+    assert isinstance(configs, list) and len(configs) == 2, configs
+    assert "lr_scheduler" not in configs[0], "first optimizer should have no scheduler"
+    assert configs[1]["lr_scheduler"].optimizer is configs[1]["optimizer"], "scheduler bound to wrong optimizer"
+
+    # the mispairing the old code would have produced
+    lrs = [c["optimizer"].param_groups[0]["lr"] for c in configs]
+    assert lrs == [0.01, 0.5], lrs
+    print(f"  2 optimizers (lr={lrs}); scheduler attached to the second one only")
+
+
+def test_single_optimizer_shapes():
+    m = TupleProbe(net=nn.Linear(4, 3), optimizer=partial(optim.SGD, lr=0.1))
+    cfg = m.configure_optimizers()
+    assert isinstance(cfg, dict) and set(cfg) == {"optimizer"}, cfg
+
+    m2 = TupleProbe(
+        net=nn.Linear(4, 3),
+        optimizer=partial(optim.SGD, lr=0.1),
+        lr_scheduler=lambda o: optim.lr_scheduler.StepLR(o, 1),
+    )
+    cfg2 = m2.configure_optimizers()
+    assert set(cfg2) == {"optimizer", "lr_scheduler"}
+    assert cfg2["lr_scheduler"].optimizer is cfg2["optimizer"]
+
+    m3 = TupleProbe(net=nn.Linear(4, 3))
+    assert m3.configure_optimizers() is None
+    print("  single-optimizer / none returns still valid for Lightning")
+
+
+def test_exclude_no_grad_applies_to_submodules():
+    class Frozen(AutoModule):
+        def __init__(self, exclude):
+            super().__init__(net=nn.Linear(4, 3), exclude_no_grad=exclude)
+            self.head = nn.Linear(3, 3)
+            self.head.bias.requires_grad_(False)
+            self.register_optimizer(self.head, partial(optim.SGD, lr=0.1))
+
+        def shared_step(self, phase, batch, batch_idx):
+            raise NotImplementedError
+
+    n_excluded = len(Frozen(True).configure_optimizers()["optimizer"].param_groups[0]["params"])
+    n_included = len(Frozen(False).configure_optimizers()["optimizer"].param_groups[0]["params"])
+    print(f"  submodule optimizer params: exclude_no_grad=True -> {n_excluded}, False -> {n_included}")
+    assert (n_excluded, n_included) == (1, 2)
+
+
+def test_callable_optimizer_rejects_scheduler_instance():
+    m = TupleProbe(net=nn.Linear(4, 3))
+    opt = optim.SGD(m.parameters(), lr=0.1)
+    m.optimizers_schedulers = {m: (partial(optim.SGD, lr=0.1), optim.lr_scheduler.StepLR(opt, 1))}
+    try:
+        m.configure_optimizers()
+    except TypeError as e:
+        print(f"  callable optimizer + scheduler instance rejected: {e}")
+        return
+    raise AssertionError("mismatched optimizer/scheduler pair was accepted")
+

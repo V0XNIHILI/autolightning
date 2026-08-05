@@ -1,8 +1,3 @@
-"""Tests for the AutoModule changes.
-
-Run: python test_automodule.py
-"""
-
 import warnings
 from functools import partial
 
@@ -38,8 +33,6 @@ def trainer(**kw):
         **kw,
     )
 
-
-# ---------------------------------------------------------------- 1. leakage
 
 class PhaseProbe(AutoModule):
     """Feeds a constant 1.0 into the metric during train and 0.0 during val/test.
@@ -146,8 +139,6 @@ def test_test_phase_isolated():
     assert abs(test_val - 0.5) < 1e-6
 
 
-# ---------------------------------------------------------------- 2. phases key
-
 class TupleProbe(AutoModule):
     def shared_step(self, phase, batch, batch_idx):
         x, y = batch
@@ -183,87 +174,6 @@ def test_invalid_phase_rejected():
     raise AssertionError("invalid phase was accepted")
 
 
-# ---------------------------------------------------------------- 3. optimizers
-
-class MultiOpt(AutoModule):
-    def __init__(self, **kw):
-        super().__init__(**kw)
-        self.head = nn.Linear(3, 3)
-        self.register_optimizer(
-            self.head,
-            partial(optim.SGD, lr=0.5),
-            lambda o: optim.lr_scheduler.StepLR(o, step_size=1),
-        )
-
-    def shared_step(self, phase, batch, batch_idx):
-        x, y = batch
-        return self.head(self.net(x)), y
-
-
-def test_scheduler_stays_paired_with_its_optimizer():
-    m = MultiOpt(net=nn.Linear(4, 3), criterion=nn.CrossEntropyLoss(), optimizer=partial(optim.SGD, lr=0.01))
-    configs = m.configure_optimizers()
-
-    assert isinstance(configs, list) and len(configs) == 2, configs
-    assert "lr_scheduler" not in configs[0], "first optimizer should have no scheduler"
-    assert configs[1]["lr_scheduler"].optimizer is configs[1]["optimizer"], "scheduler bound to wrong optimizer"
-
-    # the mispairing the old code would have produced
-    lrs = [c["optimizer"].param_groups[0]["lr"] for c in configs]
-    assert lrs == [0.01, 0.5], lrs
-    print(f"  2 optimizers (lr={lrs}); scheduler attached to the second one only")
-
-
-def test_single_optimizer_shapes():
-    m = TupleProbe(net=nn.Linear(4, 3), optimizer=partial(optim.SGD, lr=0.1))
-    cfg = m.configure_optimizers()
-    assert isinstance(cfg, dict) and set(cfg) == {"optimizer"}, cfg
-
-    m2 = TupleProbe(
-        net=nn.Linear(4, 3),
-        optimizer=partial(optim.SGD, lr=0.1),
-        lr_scheduler=lambda o: optim.lr_scheduler.StepLR(o, 1),
-    )
-    cfg2 = m2.configure_optimizers()
-    assert set(cfg2) == {"optimizer", "lr_scheduler"}
-    assert cfg2["lr_scheduler"].optimizer is cfg2["optimizer"]
-
-    m3 = TupleProbe(net=nn.Linear(4, 3))
-    assert m3.configure_optimizers() is None
-    print("  single-optimizer / none returns still valid for Lightning")
-
-
-def test_exclude_no_grad_applies_to_submodules():
-    class Frozen(AutoModule):
-        def __init__(self, exclude):
-            super().__init__(net=nn.Linear(4, 3), exclude_no_grad=exclude)
-            self.head = nn.Linear(3, 3)
-            self.head.bias.requires_grad_(False)
-            self.register_optimizer(self.head, partial(optim.SGD, lr=0.1))
-
-        def shared_step(self, phase, batch, batch_idx):
-            raise NotImplementedError
-
-    n_excluded = len(Frozen(True).configure_optimizers()["optimizer"].param_groups[0]["params"])
-    n_included = len(Frozen(False).configure_optimizers()["optimizer"].param_groups[0]["params"])
-    print(f"  submodule optimizer params: exclude_no_grad=True -> {n_excluded}, False -> {n_included}")
-    assert (n_excluded, n_included) == (1, 2)
-
-
-def test_callable_optimizer_rejects_scheduler_instance():
-    m = TupleProbe(net=nn.Linear(4, 3))
-    opt = optim.SGD(m.parameters(), lr=0.1)
-    m.optimizers_schedulers = {m: (partial(optim.SGD, lr=0.1), optim.lr_scheduler.StepLR(opt, 1))}
-    try:
-        m.configure_optimizers()
-    except TypeError as e:
-        print(f"  callable optimizer + scheduler instance rejected: {e}")
-        return
-    raise AssertionError("mismatched optimizer/scheduler pair was accepted")
-
-
-# ---------------------------------------------------------------- 4. splatting
-
 def test_tuple_vs_list_splatting():
     seen = []
     f = lambda *a, **k: seen.append((a, k))
@@ -277,24 +187,6 @@ def test_tuple_vs_list_splatting():
     assert seen[2] == ((), {"a": 1}), seen[2]
     print("  tuple -> f(*args), list -> f(args), dict -> f(**args)  [as documented]")
 
-
-if __name__ == "__main__":
-    tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
-    failed = 0
-
-    for fn in tests:
-        print(f"\n{fn.__name__}")
-        try:
-            fn()
-            print("  PASS")
-        except Exception as e:
-            failed += 1
-            print(f"  FAIL: {type(e).__name__}: {e}")
-
-    print(f"\n{len(tests) - failed}/{len(tests)} passed")
-
-
-# ---------------------------------------------------------------- 5. stateful metrics log in train
 
 class BinaryTuple(AutoModule):
     def configure_metrics(self):
