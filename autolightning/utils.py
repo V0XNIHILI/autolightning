@@ -9,7 +9,7 @@ import torch.nn as nn
 from lightning.pytorch.cli import OptimizerCallable
 from pytorch_lightning.cli import instantiate_class
 
-from autolightning.types import LRSchedulerCallableAll
+from autolightning.types import LRSchedulerCallableAll, NetType
 
 
 LIGHTNING_STATE_DICT_KEYS = [
@@ -79,7 +79,7 @@ def compile(
     module: nn.Module,
     compiler_path: str,
     compiler_kwargs: Optional[Dict[str, Any]] = None,
-) -> nn.Module:
+) -> NetType:
     function = _import_module(compiler_path)
 
     return function(module, **(compiler_kwargs if compiler_kwargs is not None else {}))
