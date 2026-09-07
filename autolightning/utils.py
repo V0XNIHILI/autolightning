@@ -76,10 +76,10 @@ def load(
 
 
 def compile(
-    module: nn.Module,
+    module: NetType,
     compiler_path: str,
     compiler_kwargs: Optional[Dict[str, Any]] = None,
-) -> NetType:
+) -> nn.Module:
     function = _import_module(compiler_path)
 
     return function(module, **(compiler_kwargs if compiler_kwargs is not None else {}))
