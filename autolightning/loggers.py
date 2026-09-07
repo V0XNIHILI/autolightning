@@ -5,7 +5,6 @@ from lightning.pytorch.loggers import (
     CSVLogger,
     Logger,
     MLFlowLogger,
-    NeptuneLogger,
     TensorBoardLogger,
     WandbLogger,
 )
@@ -140,10 +139,6 @@ class AutoMLFlowLogger(LogKeyMixin, MLFlowLogger):
     pass
 
 
-class AutoNeptuneLogger(LogKeyMixin, NeptuneLogger):
-    pass
-
-
 class AutoTensorBoardLogger(LogKeyMixin, TensorBoardLogger):
     pass
 
@@ -161,7 +156,6 @@ __all__ = [
     "AutoCSVLogger",
     "AutoLogger",
     "AutoMLFlowLogger",
-    "AutoNeptuneLogger",
     "AutoTensorBoardLogger",
     "AutoWandbLogger",
     "PandasLogger",
