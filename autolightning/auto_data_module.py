@@ -11,7 +11,14 @@ from torchvision.transforms import Compose
 
 from torch_mate.data.utils import Transformed, TransformedIterable, PreLoaded
 
-from autolightning.types import DatasetType, Phase, TransformValue, PHASES
+from autolightning.types import (
+    AllDatasetsType,
+    DatasetType,
+    Phase,
+    TransformType,
+    TransformValue,
+    PHASES,
+)
 from autolightning.auto_data_helpers import STAGE_PHASES, build_dataset_plan
 
 
@@ -20,9 +27,6 @@ PRE_LOAD_MOMENT = "pre_load"
 ARGS_KEY = "args"
 FOLD_IDX_KEY = "fold_idx"
 N_FOLDS_KEY = "n_folds"
-
-AllDatasetsType = Union[DatasetType, Dict]
-TransformType = Union[Dict[str, TransformValue], TransformValue]
 
 
 def compose_if_list(tf: Optional[TransformValue]) -> Optional[Callable]:

@@ -55,10 +55,23 @@ NetType = Union[nn.Module, BAMC]
 
 CallableOrModule = Union[Callable, nn.Module]
 TransformValue = Union[List[CallableOrModule], CallableOrModule]
+# A transform is either a single value applied to every phase, or a per-phase mapping
+# (e.g. {"train": ..., "post": ...}). Defined here rather than in auto_data_module so
+# that the **kwargs TypedDicts below can mirror AutoDataModule.__init__ exactly.
+TransformType = Union[Dict[str, TransformValue], TransformValue]
+AllDatasetsType = Union[DatasetType, Dict]
 
 PHASES = ["train", "val", "test", "pred"]
 
 Phase = Literal["train", "val", "test", "pred"]
+
+
+# The TypedDicts below are used as `**kwargs: Unpack[...]` annotations. Since jsonargparse
+# 4.34 those annotations are what the CLI parser reads: it builds its arguments from these
+# keys rather than following the `super().__init__(**kwargs)` chain. So a key missing here
+# is rejected on the CLI, and a type narrower than the real parameter silently rejects
+# valid configs. Keep them mirroring the __init__ they document; tests/test_cli_parser.py
+# fails if they drift.
 
 
 class AutoModuleKwargs(TypedDict, total=False):
@@ -106,26 +119,30 @@ class AutoModuleKwargsNoNetCriterion(TypedDict, total=False):
 
 
 class AutoDataModuleKwargs(TypedDict, total=False):
-    dataset: Optional[Union[Dict[str, Any], Dict, Any]]
+    dataset: Optional[Union[Dict[str, AllDatasetsType], AllDatasetsType]]
     dataloaders: Optional[Dict]
-    transforms: Optional[Callable]
-    target_transforms: Optional[Callable]
-    batch_transforms: Optional[Callable]
+    transforms: Optional[TransformType]
+    target_transforms: Optional[TransformType]
+    batch_transforms: Optional[TransformType]
+    target_batch_transforms: Optional[Union[TransformType, Literal["combine"]]]
     requires_prepare: bool
     pre_load: Union[Dict[str, bool], bool]
-    random_split: Optional[Dict[str, Union[Union[int, float], Union[str, Dict[str, Union[int, float]]]]]]
+    random_split: Optional[Dict[str, Union[int, float]]]
     cross_val: Optional[Dict[str, int]]
     seed: Optional[int]
+    build_plan: bool
 
 
 class AutoDataModuleKwargsNoDatasetPrepareSplit(TypedDict, total=False):
     dataloaders: Optional[Dict]
-    transforms: Optional[Callable]
-    target_transforms: Optional[Callable]
-    batch_transforms: Optional[Callable]
+    transforms: Optional[TransformType]
+    target_transforms: Optional[TransformType]
+    batch_transforms: Optional[TransformType]
+    target_batch_transforms: Optional[Union[TransformType, Literal["combine"]]]
     pre_load: Union[Dict[str, bool], bool]
     cross_val: Optional[Dict[str, int]]
     seed: Optional[int]
+    build_plan: bool
 
 
 class ClassifierKwargs(TypedDict, total=False):
@@ -150,6 +167,8 @@ __all__ = [
     "NetType",
     "CallableOrModule",
     "TransformValue",
+    "TransformType",
+    "AllDatasetsType",
     "Phase",
     "AutoModuleKwargs",
     "AutoModuleKwargsNoCriterion",

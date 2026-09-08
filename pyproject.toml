@@ -19,7 +19,9 @@ dependencies = [
   'lightning',
   'torchmetrics',
   'scikit-learn',
-  "jsonargparse[signatures]<= 4.33.2",
+  # Range mirrors what lightning[pytorch-extra] itself requires; a lower floor fails to
+  # resolve alongside it, and 5.0 is unreleased and not yet tested against this CLI.
+  "jsonargparse[signatures]>=4.39.0,<5.0",
   'omegaconf',
   "typing_extensions; python_version < '3.11'",
   'torch-mate@git+https://github.com/V0XNIHILI/torch-mate'
