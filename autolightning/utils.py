@@ -27,7 +27,7 @@ LIGHTNING_STATE_DICT_KEYS = [
 
 
 def _import_module(module_path: str, default_module: Optional[str] = None) -> Any:
-    split = module_path.rsplit(".")
+    split = module_path.rsplit(".", 1)
 
     if len(split) == 1:
         module_name = default_module
